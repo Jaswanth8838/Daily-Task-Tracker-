@@ -1,9 +1,10 @@
 import os
 import jwt
+import secrets
 from datetime import datetime, timedelta, timezone
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from app import db
-from models import User, Intern, AuditLog
+from models import User, Intern, AuditLog, PasswordResetToken
 from middleware import auth_required
 
 auth_bp = Blueprint('auth', __name__)
@@ -12,7 +13,7 @@ JWT_EXPIRY_HOURS = 24
 
 
 def _make_token(user: User) -> str:
-    secret = os.environ.get('JWT_SECRET_KEY', 'default_secret')
+    secret = current_app.config['JWT_SECRET_KEY']
     payload = {
         'sub': user.id,
         'name': user.name,
@@ -52,48 +53,10 @@ def login():
 
 @auth_bp.route('/api/auth/signup', methods=['POST'])
 def signup():
-    """Direct Sign Up endpoint for users / interns / managers / hr"""
-    data = request.get_json(silent=True) or {}
-    name = (data.get('name') or '').strip()
-    email = (data.get('email') or '').strip().lower()
-    role = (data.get('role') or 'intern').strip().lower()
-    password = data.get('password') or ''
-    department = (data.get('department') or 'Engineering').strip()
-    employee_id = (data.get('employee_id') or '').strip()
-
-    if not name:
-        return jsonify({'error': 'Name is required'}), 400
-    if not email or '@' not in email:
-        return jsonify({'error': 'Valid email is required'}), 400
-    if len(password) < 6:
-        return jsonify({'error': 'Password must be at least 6 characters'}), 400
-
-    if role not in ['intern', 'manager', 'hr']:
-        role = 'intern'
-
-    existing = User.query.filter_by(email=email).first()
-    if existing:
-        return jsonify({'error': 'An account with this email already exists'}), 400
-
-    user = User(name=name, email=email, role=role, status='active')
-    user.set_password(password)
-    db.session.add(user)
-    db.session.flush()
-
-    if role == 'intern':
-        intern = Intern(user_id=user.id, department=department, employee_id=employee_id)
-        db.session.add(intern)
-
-    log = AuditLog(user_name=user.name, user_role=user.role, action='SIGNUP', details=f'Account registered: {email} ({role})')
-    db.session.add(log)
-    db.session.commit()
-
-    token = _make_token(user)
+    """Disabled endpoint. Only HR can create intern and user accounts."""
     return jsonify({
-        'token': token,
-        'user': user.to_dict(),
-        'message': 'Account registered successfully'
-    }), 201
+        'error': 'Self-registration is disabled. Accounts can only be provisioned by HR Administrators.'
+    }), 403
 
 
 @auth_bp.route('/api/auth/me', methods=['GET'])
@@ -122,3 +85,80 @@ def update_profile():
 
     db.session.commit()
     return jsonify({'user': user.to_dict(), 'message': 'Profile updated successfully'}), 200
+
+
+@auth_bp.route('/api/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+
+    if not email:
+        return jsonify({'error': 'Corporate email is required'}), 400
+
+    generic_msg = 'If an account exists for this email, password reset instructions will be sent.'
+
+    user = User.query.filter_by(email=email, status='active').first()
+    dev_token = None
+    if user:
+        PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({'used': True})
+
+        token_str = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        reset_token = PasswordResetToken(
+            user_id=user.id,
+            token=token_str,
+            expires_at=expires_at
+        )
+        db.session.add(reset_token)
+
+        log = AuditLog(
+            user_name=user.name,
+            user_role=user.role,
+            action='FORGOT_PASSWORD_REQUEST',
+            details=f'Password reset requested for: {user.email}'
+        )
+        db.session.add(log)
+        db.session.commit()
+        dev_token = token_str
+
+    res = {'message': generic_msg}
+    if dev_token:
+        res['dev_reset_token'] = dev_token
+
+    return jsonify(res), 200
+
+
+@auth_bp.route('/api/auth/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json(silent=True) or {}
+    token_str = (data.get('token') or '').strip()
+    new_password = data.get('password') or ''
+
+    if not token_str or not new_password:
+        return jsonify({'error': 'Reset token and new password are required'}), 400
+
+    if len(new_password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters long'}), 400
+
+    reset_token = PasswordResetToken.query.filter_by(token=token_str, used=False).first()
+    if not reset_token or not reset_token.is_valid():
+        return jsonify({'error': 'Invalid or expired password reset link'}), 400
+
+    user = reset_token.user
+    if not user or user.status != 'active':
+        return jsonify({'error': 'User account is no longer active'}), 400
+
+    user.set_password(new_password)
+    reset_token.used = True
+
+    log = AuditLog(
+        user_name=user.name,
+        user_role=user.role,
+        action='PASSWORD_RESET_SUCCESS',
+        details=f'Password reset completed for: {user.email}'
+    )
+    db.session.add(log)
+    db.session.commit()
+
+    return jsonify({'message': 'Password reset successfully. You can now sign in with your new password.'}), 200
+

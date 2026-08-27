@@ -1,16 +1,17 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from models import Trainer, Technology, TrainingConcept
-from middleware import role_required
+from middleware import role_required, auth_required
 
 master_data_bp = Blueprint('master_data', __name__)
 
-# --- Trainers ---
+# ─── Trainers ───────────────────────────────────────────────────────────────────
 
 @master_data_bp.route('/api/trainers', methods=['GET'])
-@role_required('hr', 'manager')
+@role_required('hr', 'intern')
 def get_trainers():
-    trainers = Trainer.query.all()
+    """Interns need this to populate DailyTrackerForm dropdowns."""
+    trainers = Trainer.query.filter_by(status='active').all()
     return jsonify([t.to_dict() for t in trainers]), 200
 
 
@@ -52,10 +53,19 @@ def update_trainer(trainer_id):
     return jsonify(trainer.to_dict()), 200
 
 
-# --- Technologies ---
+@master_data_bp.route('/api/trainers/<int:trainer_id>', methods=['DELETE'])
+@role_required('hr')
+def delete_trainer(trainer_id):
+    trainer = Trainer.query.get_or_404(trainer_id)
+    db.session.delete(trainer)
+    db.session.commit()
+    return jsonify({'message': 'Trainer deleted'}), 200
+
+
+# ─── Technologies ──────────────────────────────────────────────────────────────
 
 @master_data_bp.route('/api/technologies', methods=['GET'])
-@role_required('hr', 'manager', 'intern')
+@role_required('hr', 'intern')
 def get_technologies():
     techs = Technology.query.all()
     return jsonify([t.to_dict() for t in techs]), 200
@@ -93,16 +103,24 @@ def update_technology(tech_id):
     return jsonify(tech.to_dict()), 200
 
 
-# --- Concepts ---
+@master_data_bp.route('/api/technologies/<int:tech_id>', methods=['DELETE'])
+@role_required('hr')
+def delete_technology(tech_id):
+    tech = Technology.query.get_or_404(tech_id)
+    db.session.delete(tech)
+    db.session.commit()
+    return jsonify({'message': 'Technology deleted'}), 200
+
+
+# ─── Concepts ─────────────────────────────────────────────────────────────────
 
 @master_data_bp.route('/api/concepts', methods=['GET'])
-@role_required('hr', 'manager', 'intern')
+@role_required('hr', 'intern')
 def get_concepts():
     technology_id = request.args.get('technology_id')
     query = TrainingConcept.query
     if technology_id:
         query = query.filter_by(technology_id=technology_id)
-
     concepts = query.all()
     return jsonify([c.to_dict() for c in concepts]), 200
 
@@ -140,3 +158,12 @@ def update_concept(concept_id):
 
     db.session.commit()
     return jsonify(concept.to_dict()), 200
+
+
+@master_data_bp.route('/api/concepts/<int:concept_id>', methods=['DELETE'])
+@role_required('hr')
+def delete_concept(concept_id):
+    concept = TrainingConcept.query.get_or_404(concept_id)
+    db.session.delete(concept)
+    db.session.commit()
+    return jsonify({'message': 'Concept deleted'}), 200

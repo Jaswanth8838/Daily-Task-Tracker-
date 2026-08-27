@@ -33,7 +33,7 @@ def admin_dashboard_stats():
     today = get_today_local()
     total_users = User.query.count()
     active_employees = User.query.filter(
-        User.role.in_(['employee', 'manager']), User.status == 'active'
+        User.role == 'employee', User.status == 'active'
     ).count()
     active_interns = User.query.filter_by(role='intern', status='active').count()
 

@@ -29,13 +29,7 @@ def dashboard_stats():
         total_interns = 1
         updates_today = DailyUpdate.query.filter_by(user_id=user_id, date=today).count()
         locked_entries = DailyUpdate.query.filter_by(user_id=user_id, status='locked').count()
-    elif user_role == 'manager':
-        managed_interns = Intern.query.filter_by(manager_id=user_id).all()
-        managed_ids = [i.user_id for i in managed_interns]
-        total_interns = len(managed_ids)
-        updates_today = DailyUpdate.query.filter(DailyUpdate.user_id.in_(managed_ids), DailyUpdate.date == today).count() if managed_ids else 0
-        locked_entries = DailyUpdate.query.filter(DailyUpdate.user_id.in_(managed_ids), DailyUpdate.status == 'locked').count() if managed_ids else 0
-    else:  # hr
+    else:  # hr / admin
         total_interns = User.query.filter_by(role='intern', status='active').count()
         updates_today = DailyUpdate.query.filter_by(date=today).count()
         locked_entries = DailyUpdate.query.filter_by(status='locked').count()

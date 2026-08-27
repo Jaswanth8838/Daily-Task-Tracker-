@@ -1,17 +1,24 @@
 #!/bin/bash
 set -e
 
-echo "Waiting for database to be ready..."
+echo "==> Starting Task Tracker backend..."
 
-# Flask-Migrate: init if first time, then upgrade
-if [ ! -d "migrations" ]; then
-    echo "Initializing Flask-Migrate..."
-    flask db init
-    flask db migrate -m "initial: users table"
-fi
+echo "==> Ensuring all database tables exist..."
+python -c "
+from app import create_app, db
+app = create_app()
+with app.app_context():
+    db.create_all()
+    try:
+        db.session.execute(db.text('ALTER TABLE daily_updates ADD COLUMN IF NOT EXISTS session_number INTEGER;'))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+    print('  Tables OK')
+"
 
-echo "Running database migrations..."
-flask db upgrade
+echo "==> Seeding users and master data..."
+python seed_data.py
 
-echo "Starting Flask..."
+echo "==> Starting Flask development server..."
 exec flask run --host=0.0.0.0 --port=5000 --reload

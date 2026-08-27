@@ -6,7 +6,6 @@ interface InternReport {
   id: number
   user_name: string
   user_email: string
-  department: string
   date: string
   training_details: string
   training_status: string

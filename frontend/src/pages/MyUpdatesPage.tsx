@@ -1,388 +1,370 @@
-import React, { useEffect, useState } from 'react'
-import { FileText, Calendar, Filter, Search, CheckCircle2, Lock, Clock, BookOpen, Users, Code2, Eye } from 'lucide-react'
+import React, { useEffect, useState, useCallback } from 'react'
+import { FileText, Calendar, Filter, Search, CheckCircle2, Clock, BookOpen, User as UserIcon, Code2, Eye, X, RefreshCw } from 'lucide-react'
 import api from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 
-// Employee Update Interface
-interface UpdateItem {
+interface DailySessionUpdate {
   id: number
   date: string
+  session_number: number
+  session_name: string
   trainer_name: string
   technology_name: string
-  session_name: string
   concepts_covered: string
   duration_hrs: number
   update_text: string
   status: string
   created_at: string
-  today_work?: string
-  what_learned?: string
-  overall_progress?: number
-  remarks?: string
 }
 
-// Intern Update Interface
-interface InternUpdateItem {
-  id: number
-  date: string
-  training_details: string
-  training_status: string
-  training_progress: number
-  meeting_details: string
-  meeting_status: string
-  meeting_notes: string
-  practice_details: string
-  practice_status: string
-  practice_progress: number
-  overall_status: string
-  is_frozen: boolean
-  created_at: string
-  updated_at: string
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  not_started: 'bg-slate-100 text-slate-600 border-slate-200',
-  in_progress: 'bg-blue-50 text-blue-700 border-blue-200',
-  completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  blocked: 'bg-red-50 text-red-700 border-red-200',
-}
+const ITEMS_PER_PAGE = 12
 
 const MyUpdatesPage: React.FC = () => {
   const { user } = useAuth()
-  const isIntern = user?.role === 'intern'
-
-  const [empUpdates, setEmpUpdates] = useState<UpdateItem[]>([])
-  const [internUpdates, setInternUpdates] = useState<InternUpdateItem[]>([])
+  const [updates, setUpdates] = useState<DailySessionUpdate[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedUpdate, setSelectedUpdate] = useState<DailySessionUpdate | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const [selectedEmpUpdate, setSelectedEmpUpdate] = useState<UpdateItem | null>(null)
-  const [selectedInternUpdate, setSelectedInternUpdate] = useState<InternUpdateItem | null>(null)
-
-  const fetchMyUpdates = async () => {
-    setLoading(true)
+  const fetchMyUpdates = useCallback(async () => {
     try {
-      if (isIntern) {
-        const res = await api.get('/intern-reports/my')
-        setInternUpdates(res.data)
-      } else {
-        const res = await api.get('/reports/my')
-        setEmpUpdates(res.data)
-      }
+      const res = await api.get('/tracker/my-updates')
+      setUpdates(res.data || [])
     } catch (err) {
-      console.error(err)
+      console.error('Failed to fetch my updates', err)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchMyUpdates()
-  }, [isIntern])
+  }, [fetchMyUpdates])
 
-  // --- Filtering ---
-  const filteredEmpUpdates = empUpdates.filter(u => {
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchMyUpdates()
+  }
+
+  // Filter updates
+  const filteredUpdates = updates.filter(u => {
+    const term = searchTerm.toLowerCase()
     const matchesSearch =
-      u.technology_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.trainer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.update_text.toLowerCase().includes(searchTerm.toLowerCase())
+      (u.technology_name || '').toLowerCase().includes(term) ||
+      (u.trainer_name || '').toLowerCase().includes(term) ||
+      (u.concepts_covered || '').toLowerCase().includes(term) ||
+      (u.update_text || '').toLowerCase().includes(term) ||
+      (u.date || '').includes(term) ||
+      (u.session_name || '').toLowerCase().includes(term)
 
     const matchesStatus = statusFilter === 'all' || u.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
-  const filteredInternUpdates = internUpdates.filter(u => {
-    const matchesSearch =
-      u.training_details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.meeting_details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.practice_details.toLowerCase().includes(searchTerm.toLowerCase())
+  // Pagination
+  const totalPages = Math.max(Math.ceil(filteredUpdates.length / ITEMS_PER_PAGE), 1)
+  const paginatedUpdates = filteredUpdates.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
 
-    const matchesStatus = statusFilter === 'all' || u.overall_status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  // Summary Metrics
+  const totalHours = updates.reduce((sum, u) => sum + (u.duration_hrs || 0), 0)
+  const submittedCount = updates.filter(u => u.status === 'submitted').length
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 flex flex-wrap items-center justify-between gap-4 shadow-xs">
         <div>
-          <h2 className="text-base font-bold text-slate-800">My Daily Updates History</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {isIntern
-              ? 'Track and verify all your submitted intern training and work logs'
-              : 'Track and view all your daily employee reports'}
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight flex items-center gap-2.5">
+            <FileText className="text-blue-600 dark:text-blue-400" size={24} />
+            My Daily Updates &amp; Session Records
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Review your submitted training sessions, logged hours, trainers, and technology concepts stored in PostgreSQL.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-lg text-xs">
-            <span className="text-slate-500">Total Submissions: </span>
-            <strong className="text-slate-800 font-bold">
-              {isIntern ? internUpdates.length : empUpdates.length}
-            </strong>
+
+        <button
+          type="button"
+          id="btn-refresh-my-updates"
+          name="btnRefreshMyUpdates"
+          onClick={handleRefresh}
+          className="h-10 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold rounded-xl transition-colors flex items-center gap-2"
+        >
+          <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+      </div>
+
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs">
+          <div className="flex items-center justify-between text-blue-600 dark:text-blue-400 mb-2">
+            <BookOpen size={20} />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total</span>
           </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-800 dark:text-white leading-tight">
+            {updates.length}
+          </p>
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">Logged Sessions</p>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs">
+          <div className="flex items-center justify-between text-indigo-600 dark:text-indigo-400 mb-2">
+            <Clock size={20} />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Hours</span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-800 dark:text-white leading-tight">
+            {totalHours.toFixed(1)} <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">hrs</span>
+          </p>
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">Total Training Hours</p>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs">
+          <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-2">
+            <CheckCircle2 size={20} />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Status</span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-800 dark:text-white leading-tight">
+            {submittedCount}
+          </p>
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">Submitted Sessions</p>
+        </div>
+
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs">
+          <div className="flex items-center justify-between text-purple-600 dark:text-purple-400 mb-2">
+            <Calendar size={20} />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Days</span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-slate-800 dark:text-white leading-tight">
+            {Math.ceil(updates.length / 3)}
+          </p>
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">Unique Training Days</p>
         </div>
       </div>
 
-      {/* Filters Bar */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-80">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* Filter and Search Bar */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="relative flex-1 min-w-[260px]">
+          <label htmlFor="my-updates-search" className="sr-only">Search updates</label>
+          <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
+            id="my-updates-search"
+            name="myUpdatesSearch"
             type="text"
+            placeholder="Search by technology, trainer, concepts, or date…"
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            placeholder={isIntern ? "Search details, meetings, practice..." : "Search technology, trainer, topics..."}
-            className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }}
+            className="w-full h-10 pl-10 pr-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter size={14} className="text-slate-400" />
-          <span className="text-xs text-slate-500 font-medium">Status:</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Filter size={15} className="text-slate-400" />
+            <label htmlFor="status-filter" className="text-xs font-bold text-slate-600 dark:text-slate-300">Status:</label>
+          </div>
           <select
+            id="status-filter"
+            name="statusFilter"
             value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1) }}
+            className="h-10 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Statuses</option>
-            <option value="not_started">Not Started</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="blocked">Blocked</option>
+            <option value="submitted">Submitted</option>
+            <option value="draft">Draft</option>
           </select>
         </div>
       </div>
 
-      {/* Updates History Grid / Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
+      {/* Sessions Table Card */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
         {loading ? (
-          <div className="flex justify-center p-12">
-            <span className="w-8 h-8 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin"></span>
+          <div className="py-20 text-center">
+            <div className="w-8 h-8 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Loading your session records…</p>
           </div>
-        ) : isIntern ? (
-          /* Intern Report History Table */
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-left">
-                <tr>
-                  <th className="px-5 py-3">Date</th>
-                  <th className="px-5 py-3">Training Progress</th>
-                  <th className="px-5 py-3">Meeting Status</th>
-                  <th className="px-5 py-3">Practice Progress</th>
-                  <th className="px-5 py-3 text-center">Overall Status</th>
-                  <th className="px-5 py-3 text-center">Freeze Status</th>
-                  <th className="px-5 py-3 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredInternUpdates.map(u => (
-                  <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-5 py-3.5 font-bold text-slate-800 whitespace-nowrap">{u.date}</td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <BookOpen size={13} className="text-blue-500" />
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${STATUS_COLORS[u.training_status]}`}>
-                          {u.training_progress}% ({u.training_status.replace('_', ' ')})
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <Users size={13} className="text-purple-500" />
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${STATUS_COLORS[u.meeting_status]}`}>
-                          {u.meeting_status.replace('_', ' ')}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <Code2 size={13} className="text-emerald-500" />
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${STATUS_COLORS[u.practice_status]}`}>
-                          {u.practice_progress}% ({u.practice_status.replace('_', ' ')})
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${STATUS_COLORS[u.overall_status]}`}>
-                        {u.overall_status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      {u.is_frozen ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-bold">
-                          <Lock size={10} /> FROZEN
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <button
-                        onClick={() => setSelectedInternUpdate(u)}
-                        className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1.5 mx-auto"
-                      >
-                        <Eye size={13} /> View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filteredInternUpdates.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-slate-400">
-                      <FileText size={32} className="mx-auto mb-2 opacity-30" />
-                      <p className="font-medium">No intern reports found</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        ) : paginatedUpdates.length === 0 ? (
+          <div className="py-16 text-center">
+            <FileText size={36} className="text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+            <p className="text-base font-semibold text-slate-700 dark:text-slate-300">No session updates found</p>
+            <p className="text-xs text-slate-400 mt-1">Submit your 3 mandatory sessions in the Daily Tracker to see them listed here.</p>
           </div>
         ) : (
-          /* Employee Update History Table */
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-left">
-                <tr>
-                  <th className="px-5 py-3">Date</th>
-                  <th className="px-5 py-3">Today's Work</th>
-                  <th className="px-5 py-3">What I Learned</th>
-                  <th className="px-5 py-3">Overall Progress</th>
-                  <th className="px-5 py-3 text-center">Status</th>
-                  <th className="px-5 py-3 text-center">Freeze Status</th>
-                  <th className="px-5 py-3 text-center">Action</th>
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3.5 px-6">Date</th>
+                  <th className="py-3.5 px-4">Session</th>
+                  <th className="py-3.5 px-4">Trainer</th>
+                  <th className="py-3.5 px-4">Technology</th>
+                  <th className="py-3.5 px-4">Concepts Covered</th>
+                  <th className="py-3.5 px-4">Duration</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-6 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredEmpUpdates.map(u => (
-                  <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-5 py-3.5 font-bold text-slate-800 whitespace-nowrap">{u.date}</td>
-                    <td className="px-5 py-3.5 text-slate-600 max-w-[200px] truncate">{u.today_work}</td>
-                    <td className="px-5 py-3.5 text-slate-600 max-w-[150px] truncate">{u.what_learned}</td>
-                    <td className="px-5 py-3.5 font-bold text-slate-800">{u.overall_progress}%</td>
-                    <td className="px-5 py-3.5 text-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_COLORS[u.status]}`}>
-                        {u.status}
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                {paginatedUpdates.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3.5 px-6 font-semibold text-slate-800 dark:text-white whitespace-nowrap">
+                      {item.date}
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                      <span className="inline-block bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg text-xs font-extrabold border border-slate-200 dark:border-slate-700">
+                        {item.session_name || `Session ${item.session_number}`}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-center">
-                      {u.status === 'locked' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-bold">
-                          <Lock size={10} /> LOCKED
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
+                      {item.trainer_name || 'N/A'}
                     </td>
-                    <td className="px-5 py-3.5 text-center">
-                      <button
-                        onClick={() => setSelectedEmpUpdate(u)}
-                        className="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1.5 mx-auto"
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
+                      {item.technology_name || 'N/A'}
+                    </td>
+                    <td className="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-300">
+                      <div className="flex flex-wrap gap-1 max-w-xs">
+                        {(item.concepts_covered || '').split(',').map((c, i) => (
+                          <span key={i} className="inline-block bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-semibold text-[11px] px-2 py-0.5 rounded border border-blue-100 dark:border-blue-900/60">
+                            {c.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-slate-800 dark:text-white whitespace-nowrap">
+                      {item.duration_hrs.toFixed(1)} hrs
+                    </td>
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold border ${
+                          item.status === 'submitted'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60'
+                            : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60'
+                        }`}
                       >
-                        <Eye size={13} /> View
+                        {item.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-6 text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        id={`btn-view-update-${item.id}`}
+                        name={`btnViewUpdate-${item.id}`}
+                        onClick={() => setSelectedUpdate(item)}
+                        className="h-8 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg transition-colors inline-flex items-center gap-1.5"
+                      >
+                        <Eye size={13} />
+                        View
                       </button>
                     </td>
                   </tr>
                 ))}
-                {filteredEmpUpdates.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-slate-400">
-                      <FileText size={32} className="mx-auto mb-2 opacity-30" />
-                      <p className="font-medium">No reports found</p>
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
         )}
-      </div>
 
-      {/* Intern Report Detail Modal */}
-      {selectedInternUpdate && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setSelectedInternUpdate(null)}>
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl border border-slate-100 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">Intern Daily Report Detail</h3>
-                <p className="text-xs text-slate-500">Submitted for Date: {selectedInternUpdate.date}</p>
-              </div>
-              <button onClick={() => setSelectedInternUpdate(null)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              {/* Training */}
-              <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-4">
-                <div className="flex items-center gap-2 mb-2 font-bold text-slate-700"><BookOpen size={14} className="text-blue-600" /> Training</div>
-                <p className="text-slate-600 mb-2 whitespace-pre-wrap">{selectedInternUpdate.training_details || 'No training details logged'}</p>
-                <div className="flex items-center gap-4">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${STATUS_COLORS[selectedInternUpdate.training_status]}`}>{selectedInternUpdate.training_status.replace('_',' ')}</span>
-                  <span className="text-slate-500">Progress: <strong>{selectedInternUpdate.training_progress}%</strong></span>
-                </div>
-              </div>
-
-              {/* Meeting */}
-              <div className="rounded-lg border border-purple-200 bg-purple-50/40 p-4">
-                <div className="flex items-center gap-2 mb-2 font-bold text-slate-700"><Users size={14} className="text-purple-600" /> Meetings</div>
-                <p className="text-slate-600 mb-2 whitespace-pre-wrap">{selectedInternUpdate.meeting_details || 'No meetings logged'}</p>
-                {selectedInternUpdate.meeting_notes && (
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 block mb-1">Notes:</span>
-                    <p className="bg-white/80 p-2 rounded border border-purple-100 text-slate-600">{selectedInternUpdate.meeting_notes}</p>
-                  </div>
-                )}
-                <div className="mt-2">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${STATUS_COLORS[selectedInternUpdate.meeting_status]}`}>{selectedInternUpdate.meeting_status.replace('_',' ')}</span>
-                </div>
-              </div>
-
-              {/* Practice */}
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
-                <div className="flex items-center gap-2 mb-2 font-bold text-slate-700"><Code2 size={14} className="text-emerald-600" /> Practice & Coding</div>
-                <p className="text-slate-600 mb-2 whitespace-pre-wrap">{selectedInternUpdate.practice_details || 'No practice logged'}</p>
-                <div className="flex items-center gap-4">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${STATUS_COLORS[selectedInternUpdate.practice_status]}`}>{selectedInternUpdate.practice_status.replace('_',' ')}</span>
-                  <span className="text-slate-500">Progress: <strong>{selectedInternUpdate.practice_progress}%</strong></span>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center pt-3 border-t border-slate-100 text-slate-500">
-                <div>Overall Day Status: <span className={`ml-1 font-bold px-2 py-0.5 rounded ${STATUS_COLORS[selectedInternUpdate.overall_status]}`}>{selectedInternUpdate.overall_status.replace('_',' ')}</span></div>
-                {selectedInternUpdate.is_frozen && <span className="text-amber-700 font-bold flex items-center gap-1"><Lock size={12} /> LOCKED / FROZEN</span>}
-              </div>
+        {/* Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                id="btn-my-updates-prev"
+                name="btnMyUpdatesPrev"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-lg disabled:opacity-40 transition-colors"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                id="btn-my-updates-next"
+                name="btnMyUpdatesNext"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-lg disabled:opacity-40 transition-colors"
+              >
+                Next
+              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Employee Detail Modal */}
-      {selectedEmpUpdate && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setSelectedEmpUpdate(null)}>
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+      {/* Detail Modal */}
+      {selectedUpdate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h3 className="text-sm font-bold text-slate-800">Daily Update Details</h3>
-                <p className="text-xs text-slate-500">Date: {selectedEmpUpdate.date}</p>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white">
+                  {selectedUpdate.session_name || `Session ${selectedUpdate.session_number}`} Details
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{selectedUpdate.date}</p>
               </div>
-              <button onClick={() => setSelectedEmpUpdate(null)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+              <button
+                type="button"
+                onClick={() => setSelectedUpdate(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <div>Technology: <strong>{selectedEmpUpdate.technology_name}</strong></div>
-                <div>Trainer: <strong>{selectedEmpUpdate.trainer_name}</strong></div>
-                <div>Session: <strong>{selectedEmpUpdate.session_name}</strong></div>
-                <div>Duration: <strong>{selectedEmpUpdate.duration_hrs} hours</strong></div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
+                <span className="text-slate-400 font-semibold">Trainer:</span>
+                <p className="font-bold text-slate-800 dark:text-white text-sm mt-0.5">{selectedUpdate.trainer_name}</p>
               </div>
-              <div>
-                <span className="text-slate-500 font-semibold block mb-1">Today's Work:</span>
-                <p className="bg-slate-50 p-2.5 rounded border border-slate-100 text-slate-700 whitespace-pre-wrap">{selectedEmpUpdate.today_work || selectedEmpUpdate.update_text}</p>
+
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
+                <span className="text-slate-400 font-semibold">Technology:</span>
+                <p className="font-bold text-slate-800 dark:text-white text-sm mt-0.5">{selectedUpdate.technology_name}</p>
               </div>
-              {selectedEmpUpdate.what_learned && (
-                <div>
-                  <span className="text-slate-500 font-semibold block mb-1">What I Learned:</span>
-                  <p className="bg-slate-50 p-2.5 rounded border border-slate-100 text-slate-700 whitespace-pre-wrap">{selectedEmpUpdate.what_learned}</p>
-                </div>
-              )}
+
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl col-span-2">
+                <span className="text-slate-400 font-semibold">Concepts Covered:</span>
+                <p className="font-bold text-slate-800 dark:text-white text-xs mt-0.5">{selectedUpdate.concepts_covered}</p>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
+                <span className="text-slate-400 font-semibold">Duration:</span>
+                <p className="font-bold text-slate-800 dark:text-white text-sm mt-0.5">{selectedUpdate.duration_hrs.toFixed(1)} hrs</p>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl">
+                <span className="text-slate-400 font-semibold">Status:</span>
+                <p className="font-bold text-emerald-600 dark:text-emerald-400 text-sm mt-0.5">{selectedUpdate.status.toUpperCase()}</p>
+              </div>
+            </div>
+
+            <div>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Daily Update Text:</span>
+              <div className="mt-1.5 p-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-xs text-slate-800 dark:text-slate-100 whitespace-pre-wrap leading-relaxed">
+                {selectedUpdate.update_text}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedUpdate(null)}
+                className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl text-xs shadow-xs"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

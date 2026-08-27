@@ -16,10 +16,21 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Handle 401 globally — clear session and redirect to login
+// Globally handle success/error standard API envelopes
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data && response.data.success === true && 'data' in response.data) {
+      response.data = response.data.data
+    }
+    return response
+  },
   (error) => {
+    if (error.response?.data && error.response.data.success === false && error.response.data.error) {
+      const serverError = error.response.data.error
+      if (typeof serverError === 'object' && serverError.message) {
+        error.response.data.error = serverError.message
+      }
+    }
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       window.location.href = '/login'

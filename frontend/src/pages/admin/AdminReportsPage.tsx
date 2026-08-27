@@ -6,7 +6,6 @@ interface EmpReport {
   id: number
   user_name: string
   user_email: string
-  department: string
   date: string
   today_work: string
   what_learned: string
@@ -220,7 +219,7 @@ const AdminReportsPage: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-800">{selectedReport.user_name} — {selectedReport.date}</h3>
-                <p className="text-xs text-slate-500">{selectedReport.user_email} · {selectedReport.department || 'No dept'}</p>
+                <p className="text-xs text-slate-500">{selectedReport.user_email}</p>
               </div>
               <button onClick={() => setSelectedReport(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>

@@ -20,6 +20,8 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False)   # intern | manager | employee | hr | admin
     status = db.Column(db.String(20), default='active', nullable=False)
     department = db.Column(db.String(100), nullable=True)
+    employee_id = db.Column(db.String(50), unique=True, nullable=True)
+    tracker_access_status = db.Column(db.String(20), default='ACTIVE', nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -30,13 +32,16 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
+        intern_prof = Intern.query.filter_by(user_id=self.id).first() if self.id else None
+        emp_id = self.employee_id or (intern_prof.employee_id if intern_prof else None) or f"EMP-{self.id:04d}" if self.id else None
         return {
             'id': self.id,
             'name': self.name,
             'email': self.email,
+            'employee_id': emp_id,
             'role': self.role,
             'status': self.status,
-            'department': self.department,
+            'tracker_access_status': self.tracker_access_status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -102,7 +107,7 @@ class Intern(db.Model):
     def to_dict(self):
         return {
             'id': self.id, 'user_id': self.user_id, 'manager_id': self.manager_id,
-            'employee_id': self.employee_id, 'department': self.department,
+            'employee_id': self.employee_id,
             'joining_date': self.joining_date.isoformat() if self.joining_date else None,
             'status': self.status,
             'name': self.user.name if self.user else 'Unknown',
@@ -112,10 +117,71 @@ class Intern(db.Model):
         }
 
 
+class TrackerAccessOverride(db.Model):
+    __tablename__ = 'tracker_access_overrides'
+    id = db.Column(db.Integer, primary_key=True)
+    intern_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    action = db.Column(db.String(50), nullable=False)  # GRANT | REVOKE | REOPEN
+    reason = db.Column(db.Text, nullable=False)
+    enabled_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    effective_from = db.Column(db.Date, nullable=False)
+    effective_until = db.Column(db.Date, nullable=True)
+    target_date = db.Column(db.Date, nullable=True)
+
+    intern = db.relationship('User', foreign_keys=[intern_id])
+    admin = db.relationship('User', foreign_keys=[enabled_by])
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'intern_id': self.intern_id,
+            'intern_name': self.intern.name if self.intern else 'Unknown',
+            'action': self.action,
+            'reason': self.reason,
+            'enabled_by': self.enabled_by,
+            'admin_name': self.admin.name if self.admin else 'Unknown',
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'effective_from': self.effective_from.isoformat() if self.effective_from else None,
+            'effective_until': self.effective_until.isoformat() if self.effective_until else None,
+            'target_date': self.target_date.isoformat() if self.target_date else None
+        }
+
+
+class DailyTracker(db.Model):
+    __tablename__ = 'daily_trackers'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    status = db.Column(db.String(20), default='draft', nullable=False)  # draft | submitted | frozen | missed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user = db.relationship('User', foreign_keys=[user_id])
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'date', name='uq_tracker_user_date'),)
+
+    def to_dict(self):
+        sorted_sessions = sorted(self.sessions, key=lambda s: s.session_number or s.id)
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'user_name': self.user.name if self.user else 'Unknown',
+            'date': self.date.isoformat() if self.date else None,
+            'status': self.status,
+            'sessions': [s.to_dict() for s in sorted_sessions],
+            'total_duration': sum((s.duration_hrs or 0) for s in self.sessions),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
 class DailyUpdate(db.Model):
     __tablename__ = 'daily_updates'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    tracker_id = db.Column(db.Integer, db.ForeignKey('daily_trackers.id'), nullable=True)
+    session_number = db.Column(db.Integer, nullable=True)
     date = db.Column(db.Date, default=date.today, nullable=False)
     trainer_name = db.Column(db.String(100), nullable=False)
     technology_name = db.Column(db.String(100), nullable=False)
@@ -126,11 +192,16 @@ class DailyUpdate(db.Model):
     status = db.Column(db.String(20), default='submitted', nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
     user = db.relationship('User', foreign_keys=[user_id])
+    tracker = db.relationship('DailyTracker', backref=db.backref('sessions', lazy=True, cascade="all, delete-orphan"))
+
+    __table_args__ = (db.UniqueConstraint('tracker_id', 'session_number', name='uq_tracker_session_number'),)
 
     def to_dict(self):
         return {
-            'id': self.id, 'user_id': self.user_id,
+            'id': self.id, 'user_id': self.user_id, 'tracker_id': self.tracker_id,
+            'session_number': self.session_number,
             'intern_name': self.user.name if self.user else 'Unknown',
             'intern_email': self.user.email if self.user else '',
             'date': self.date.isoformat() if self.date else None,
@@ -141,6 +212,12 @@ class DailyUpdate(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+session_concepts = db.Table('session_concepts',
+    db.Column('session_id', db.Integer, db.ForeignKey('training_sessions.id'), primary_key=True),
+    db.Column('concept_id', db.Integer, db.ForeignKey('training_concepts.id'), primary_key=True)
+)
 
 
 class TrainingSession(db.Model):
@@ -156,6 +233,8 @@ class TrainingSession(db.Model):
     practice_assignment = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
+    concepts_normalized = db.relationship('TrainingConcept', secondary=session_concepts, backref=db.backref('sessions', lazy=True))
+
     def to_dict(self):
         return {
             'id': self.id, 'session_title': self.session_title,
@@ -164,6 +243,7 @@ class TrainingSession(db.Model):
             'date': self.date.isoformat() if self.date else None,
             'status': self.status,
             'practice_assignment': self.practice_assignment,
+            'concepts_normalized': [c.to_dict() for c in self.concepts_normalized],
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
@@ -382,3 +462,19 @@ class AuditLog(db.Model):
             'ip_address': self.ip_address,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
+
+class PasswordResetToken(db.Model):
+    __tablename__ = 'password_reset_tokens'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    used = db.Column(db.Boolean, default=False, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship('User', foreign_keys=[user_id])
+
+    def is_valid(self):
+        return not self.used and self.expires_at > datetime.utcnow()
+

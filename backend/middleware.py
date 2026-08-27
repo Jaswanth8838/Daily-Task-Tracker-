@@ -1,12 +1,11 @@
-import os
 import jwt
 from functools import wraps
-from flask import request, jsonify, g
+from flask import request, jsonify, g, current_app
 from datetime import datetime, timezone
 
 
 def _decode_token(token: str):
-    secret = os.environ.get('JWT_SECRET_KEY', 'default_secret')
+    secret = current_app.config['JWT_SECRET_KEY']
     return jwt.decode(token, secret, algorithms=['HS256'])
 
 

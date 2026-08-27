@@ -1,347 +1,204 @@
 import React, { useState } from 'react'
-import { Eye, EyeOff, UserPlus, LogIn, Shield, GraduationCap } from 'lucide-react'
-import WallstreetLogo from '../components/layout/WallstreetLogo'
+import { useNavigate, Link } from 'react-router-dom'
+import { Lock, Mail, AlertCircle, ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
-import api from '../lib/api'
-
-type PortalType = 'intern' | 'hr'
+import { WallstreetFullLogo } from '../components/layout/WallstreetLogo'
+import { useTheme } from '../context/ThemeContext'
 
 const LoginPage: React.FC = () => {
   const { login } = useAuth()
   const navigate = useNavigate()
+  const { theme } = useTheme()
 
-  const [portal, setPortal] = useState<PortalType>('intern')
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
-
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    department: 'Engineering',
-    employee_id: '',
-    college: '',
-    admin_code: ''
-  })
-
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setForm(f => ({ ...f, [name]: value }))
-    if (error) setError('')
-    if (success) setSuccess('')
-  }
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    setSuccess('')
+    if (loading) return
+    setError(null)
 
-    if (!form.email || !form.password) {
-      setError('Please enter your email and password')
+    const trimmedEmail = email.trim().toLowerCase()
+    if (!trimmedEmail || !password) {
+      setError('Please enter your corporate email and password.')
       return
     }
 
     setLoading(true)
     try {
-      if (mode === 'signin') {
-        await login(form.email, form.password)
-        // Login will check credentials; user role will determine UI layout
+      const loggedUser = await login(trimmedEmail, password)
+      if (loggedUser.role === 'hr' || loggedUser.role === 'admin') {
+        navigate('/admin', { replace: true })
+      } else if (loggedUser.role === 'intern') {
         navigate('/', { replace: true })
       } else {
-        if (!form.name) {
-          setError('Full Name is required for registration')
-          setLoading(false)
-          return
-        }
-
-        const role = portal === 'hr' ? 'hr' : 'intern'
-        await api.post('/auth/signup', {
-          ...form,
-          role,
-          department: form.department || (portal === 'hr' ? 'Human Resources' : 'Engineering')
-        })
-
-        setSuccess(`${portal === 'hr' ? 'HR Administrator' : 'Intern'} account created! Signing in...`)
-        await login(form.email, form.password)
-        setTimeout(() => {
-          navigate('/', { replace: true })
-        }, 800)
+        setError('Invalid corporate email or password.')
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Authentication failed. Please verify your credentials.')
+      setError('Invalid corporate email or password.')
     } finally {
       setLoading(false)
     }
   }
 
-  const isHr = portal === 'hr'
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100/90 p-4">
-      <div className="w-full max-w-md">
-        {/* Top Logo & App Title */}
-        <div className="flex flex-col items-center mb-6">
-          <WallstreetLogo className="w-14 h-14 mb-3" />
-          <div className="text-center leading-none">
-            <h1
-              className="text-2xl font-extrabold tracking-[0.08em] uppercase"
-              style={{ color: '#1e2d5b', fontFamily: "'Inter', sans-serif", letterSpacing: '0.12em' }}
-            >
-              WALL STREET
+    <div className="min-h-screen w-full flex flex-col justify-between items-center p-4 sm:p-8 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white transition-colors duration-200">
+      
+      {/* Top Header Bar */}
+      <div className="w-full max-w-7xl flex items-center justify-between py-2">
+        <div className="flex items-center gap-2">
+          <WallstreetFullLogo height={34} />
+        </div>
+        <div className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
+          Daily Task Tracker
+        </div>
+      </div>
+
+      {/* Main Full-Viewport Centered Card Container */}
+      <div className="w-full max-w-[560px] my-auto py-8">
+        
+        {/* Prominent Authentication Card */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl dark:shadow-2xl border border-slate-200/80 dark:border-slate-800 p-8 sm:p-12 transition-colors">
+
+          {/* Logo Header */}
+          <div className="flex flex-col items-center justify-center text-center">
+            <WallstreetFullLogo emblemSize={48} className="justify-center mb-4" />
+            <h1 className="text-3xl sm:text-[32px] font-bold text-slate-900 dark:text-white tracking-tight mt-1">
+              Daily Task Tracker
             </h1>
-            <p
-              className="text-[10px] font-bold tracking-[0.22em] uppercase mt-0.5"
-              style={{ color: '#f07c24', fontFamily: "'Inter', sans-serif" }}
-            >
-              LLC CONSULTING SERVICES
-            </p>
-          </div>
-          <p className="text-xs text-slate-500 mt-3">Enterprise Training & HR Platform</p>
-        </div>
-
-        {/* Portal Selector (Intern vs HR) */}
-        <div className="grid grid-cols-2 gap-2 bg-slate-200/80 p-1.5 rounded-2xl mb-4">
-          <button
-            type="button"
-            onClick={() => { setPortal('intern'); setError(''); setSuccess('') }}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
-              portal === 'intern'
-                ? 'bg-white text-blue-600 shadow-sm shadow-slate-300'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <GraduationCap size={16} className={portal === 'intern' ? 'text-blue-600' : 'text-slate-400'} />
-            Intern Portal
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setPortal('hr'); setError(''); setSuccess('') }}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
-              portal === 'hr'
-                ? 'bg-white text-purple-700 shadow-sm shadow-slate-300'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Shield size={16} className={portal === 'hr' ? 'text-purple-600' : 'text-slate-400'} />
-            HR / Admin Portal
-          </button>
-        </div>
-
-        {/* Main Card */}
-        <div className={`bg-white rounded-2xl shadow-sm border p-7 transition-all ${
-          isHr ? 'border-purple-200/90 shadow-purple-500/5' : 'border-blue-200/90 shadow-blue-500/5'
-        }`}>
-          {/* Sign In vs Sign Up Tabs */}
-          <div className="flex bg-slate-100 p-1 rounded-xl mb-5">
-            <button
-              type="button"
-              onClick={() => { setMode('signin'); setError(''); setSuccess('') }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
-                mode === 'signin'
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <LogIn size={14} />
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('signup'); setError(''); setSuccess('') }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
-                mode === 'signup'
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <UserPlus size={14} />
-              {isHr ? 'Register HR' : 'Register Intern'}
-            </button>
-          </div>
-
-          <div className="mb-4">
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                isHr ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-              }`}>
-                {isHr ? 'HR Administrator' : 'Intern Access'}
-              </span>
-            </div>
-            <h2 className="text-base font-bold text-slate-800 mt-1.5">
-              {mode === 'signin'
-                ? isHr ? 'HR Administrator Login' : 'Intern Task Portal Login'
-                : isHr ? 'Create HR Admin Account' : 'Register Intern Profile'}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {mode === 'signin'
-                ? isHr
-                  ? 'Sign in to manage master data, interns, reports, and reviews'
-                  : 'Sign in to record your daily tasks, sessions, and training updates'
-                : isHr
-                  ? 'Set up administrative credentials with company email'
-                  : 'Create your intern account to start logging daily activities'}
+            <p className="text-base sm:text-lg font-medium text-slate-500 dark:text-slate-400 mt-2">
+              Enterprise Internal Reporting &amp; Training Portal
             </p>
           </div>
 
+          <div className="border-t border-slate-100 dark:border-slate-800 my-7" />
+
+          <h2 className="text-[22px] font-bold text-slate-800 dark:text-slate-200 mb-6 text-center">
+            Intern Sign In
+          </h2>
+
+          {/* Error Message */}
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5 text-xs font-medium text-red-700">
-              {error}
+            <div
+              role="alert"
+              className="mb-6 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900/60 rounded-2xl p-4 flex items-center gap-3 text-sm text-red-700 dark:text-red-400 font-medium"
+            >
+              <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
-          {success && (
-            <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-lg px-3.5 py-2.5 text-xs font-medium text-emerald-700">
-              {success}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            {mode === 'signup' && (
-              <>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    {isHr ? 'Administrator Full Name *' : 'Intern Full Name *'}
-                  </label>
-                  <input
-                    name="name"
-                    type="text"
-                    required
-                    value={form.name}
-                    onChange={handleChange}
-                    placeholder={isHr ? 'e.g. Sarah Jenkins (HR Lead)' : 'e.g. Alex Kumar'}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {!isHr ? (
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Intern ID</label>
-                      <input
-                        name="employee_id"
-                        type="text"
-                        value={form.employee_id}
-                        onChange={handleChange}
-                        placeholder="INT-2025-01"
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Domain/Dept</label>
-                      <input
-                        name="department"
-                        type="text"
-                        value={form.department}
-                        onChange={handleChange}
-                        placeholder="Frontend / Java"
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">HR Department / Title</label>
-                    <input
-                      name="department"
-                      type="text"
-                      value={form.department}
-                      onChange={handleChange}
-                      placeholder="Talent & Training Division"
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                )}
-              </>
-            )}
-
+          {/* Sign In Form */}
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                {isHr ? 'HR Work Email Address *' : 'Intern Email Address *'}
+              <label
+                htmlFor="corporate-email"
+                className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2"
+              >
+                Corporate Email <span className="text-red-500">*</span>
               </label>
-              <input
-                name="email"
-                type="email"
-                required
-                value={form.email}
-                onChange={handleChange}
-                placeholder={isHr ? 'hr.admin@company.com' : 'intern.name@company.com'}
-                autoComplete="email"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="relative">
+                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                <input
+                  id="corporate-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="Enter your corporate email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  disabled={loading}
+                  className="w-full h-12 sm:h-[52px] pl-12 pr-4 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl text-base text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 font-medium disabled:opacity-60 transition-all"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label
+                htmlFor="password"
+                className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2"
+              >
                 Password <span className="text-red-500">*</span>
               </label>
               <div className="relative">
+                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <input
+                  id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
-                  required
-                  value={form.password}
-                  onChange={handleChange}
-                  placeholder={mode === 'signup' ? 'Min. 6 characters' : 'Enter your password'}
                   autoComplete="current-password"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 pr-10 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  disabled={loading}
+                  className="w-full h-12 sm:h-[52px] pl-12 pr-12 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl text-base text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 font-medium disabled:opacity-60 transition-all"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(p => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                 >
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
+            {/* Forgot Password Link */}
+            <div className="flex justify-end pt-1">
+              <Link
+                to="/forgot-password"
+                className="text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+              >
+                Forgot Password?
+              </Link>
+            </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
+              id="btn-sign-in-submit"
+              name="btnSignInSubmit"
               disabled={loading}
-              className={`w-full text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 mt-2 shadow-sm ${
-                isHr
-                  ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 shadow-purple-600/20'
-                  : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 shadow-blue-600/20'
-              }`}
+              className="w-full h-12 sm:h-[52px] bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl text-base transition-all shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 mt-4"
             >
               {loading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  {mode === 'signin' ? 'Authenticating…' : 'Registering account…'}
-                </>
-              ) : mode === 'signin' ? (
-                isHr ? 'Sign In as HR Admin' : 'Sign In as Intern'
+                <span className="flex items-center gap-2">
+                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Signing in…
+                </span>
               ) : (
-                isHr ? 'Complete HR Registration' : 'Complete Intern Registration'
+                <>
+                  <span>Sign In to Tracker</span>
+                  <ArrowRight size={18} />
+                </>
               )}
             </button>
           </form>
 
-          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>{mode === 'signin' ? "Don't have an account?" : 'Already registered?'}</span>
-            <button
-              type="button"
-              onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); setSuccess('') }}
-              className={`font-semibold transition-colors ${isHr ? 'text-purple-600 hover:text-purple-700' : 'text-blue-600 hover:text-blue-700'}`}
+          {/* HR Portal Navigation Link */}
+          <div className="mt-8 border-t border-slate-100 dark:border-slate-800 pt-6 text-center">
+            <Link
+              to="/admin/login"
+              className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 inline-flex items-center gap-2 transition-colors"
             >
-              {mode === 'signin' ? 'Create Account' : 'Sign In'}
-            </button>
+              <ShieldCheck size={16} />
+              HR Administrator Portal →
+            </Link>
           </div>
         </div>
-
-        {/* Footer info banner */}
-        <div className="mt-4 text-center">
-          <p className="text-[11px] text-slate-400">
-            Switch between <strong>Intern Portal</strong> and <strong>HR / Admin Portal</strong> using the tabs at the top.
-          </p>
-        </div>
       </div>
+
+      {/* Footer */}
+      <footer className="text-center text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 py-4">
+        © Wall Street Consulting Services. All rights reserved.
+      </footer>
     </div>
   )
 }

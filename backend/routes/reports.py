@@ -19,10 +19,6 @@ def get_reports_summary():
     query = DailyUpdate.query
     if user_role == 'intern':
         query = query.filter_by(user_id=user_id)
-    elif user_role == 'manager':
-        managed_interns = Intern.query.filter_by(manager_id=user_id).all()
-        managed_user_ids = [i.user_id for i in managed_interns]
-        query = query.filter(DailyUpdate.user_id.in_(managed_user_ids))
 
     all_updates = query.all()
 
@@ -73,10 +69,6 @@ def export_reports_csv():
     query = DailyUpdate.query.join(User, DailyUpdate.user_id == User.id)
     if user_role == 'intern':
         query = query.filter(DailyUpdate.user_id == user_id)
-    elif user_role == 'manager':
-        managed_interns = Intern.query.filter_by(manager_id=user_id).all()
-        managed_user_ids = [i.user_id for i in managed_interns]
-        query = query.filter(DailyUpdate.user_id.in_(managed_user_ids))
 
     updates = query.order_by(DailyUpdate.date.desc()).all()
 

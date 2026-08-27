@@ -5,7 +5,7 @@ export interface User {
   id: number
   name: string
   email: string
-  role: 'intern' | 'manager' | 'employee' | 'hr' | 'admin'
+  role: 'intern' | 'hr' | 'admin'
   status: string
 }
 
@@ -13,7 +13,7 @@ interface AuthContextValue {
   user: User | null
   token: string | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<User>
   logout: () => void
 }
 
@@ -24,7 +24,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'))
   const [loading, setLoading] = useState(true)
 
-  // Validate existing token on mount
   useEffect(() => {
     if (!token) {
       setLoading(false)
@@ -39,12 +38,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .finally(() => setLoading(false))
   }, [token])
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<User> => {
     const res = await api.post('/auth/login', { email, password })
     const { token: newToken, user: newUser } = res.data
     localStorage.setItem('token', newToken)
     setToken(newToken)
     setUser(newUser)
+    return newUser
   }, [])
 
   const logout = useCallback(() => {

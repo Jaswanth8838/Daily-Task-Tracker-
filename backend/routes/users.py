@@ -6,8 +6,9 @@ from datetime import datetime
 
 users_bp = Blueprint('users', __name__)
 
+
 @users_bp.route('/api/users', methods=['GET'])
-@role_required('hr', 'manager')
+@role_required('hr')
 def get_users():
     role = request.args.get('role')
     query = User.query
@@ -23,28 +24,39 @@ def create_user():
     data = request.get_json() or {}
     name = (data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
+    employee_id = (data.get('employee_id') or data.get('employeeId') or '').strip()
     role = data.get('role')
     password = data.get('password')
+    department = (data.get('department') or 'Engineering').strip()
 
-    if not all([name, email, role, password]):
-        return jsonify({'error': 'Name, email, role, and password are required'}), 400
+    if not all([name, email, employee_id, role, password]):
+        return jsonify({'error': 'Name, Email, Employee ID, Role, and Password are required.'}), 400
+
+    # Only intern and hr are valid roles now
+    if role not in ('intern', 'hr'):
+        return jsonify({'error': 'Role must be intern or hr'}), 400
 
     if User.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email already exists'}), 400
+        return jsonify({'error': 'Email already exists.'}), 400
+
+    existing_emp_user = User.query.filter_by(employee_id=employee_id).first()
+    existing_emp_intern = Intern.query.filter_by(employee_id=employee_id).first()
+    if existing_emp_user or existing_emp_intern:
+        return jsonify({'error': 'Employee ID already exists.'}), 400
 
     user = User(
         name=name,
         email=email,
+        employee_id=employee_id,
         role=role,
         status=data.get('status', 'active')
     )
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
-    
-    # If the role is intern, automatically create the Intern profile shell
+
     if role == 'intern':
-        intern = Intern(user_id=user.id)
+        intern = Intern(user_id=user.id, employee_id=employee_id)
         db.session.add(intern)
         db.session.commit()
 
@@ -71,14 +83,9 @@ def update_user(user_id):
 
 
 @users_bp.route('/api/interns', methods=['GET'])
-@role_required('hr', 'manager')
+@role_required('hr')
 def get_interns():
-    manager_id = request.args.get('manager_id')
-    query = Intern.query
-    if manager_id:
-        query = query.filter_by(manager_id=manager_id)
-    
-    interns = query.all()
+    interns = Intern.query.all()
     return jsonify([i.to_dict() for i in interns]), 200
 
 

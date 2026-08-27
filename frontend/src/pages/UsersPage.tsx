@@ -1,44 +1,36 @@
 import React, { useEffect, useState } from 'react'
-import { Plus, CheckCircle2, XCircle, Users as UsersIcon, UserPlus } from 'lucide-react'
+import { Plus, CheckCircle2, XCircle, Users as UsersIcon, UserPlus, AlertCircle } from 'lucide-react'
 import api from '../lib/api'
 
 interface User {
   id: number
   name: string
   email: string
+  employee_id: string
   role: string
   status: string
 }
 
-interface InternProfile {
-  id: number
-  user_id: number
-  manager_id: number | null
-  employee_id: string | null
-  department: string | null
-  joining_date: string | null
-  user: User
-  manager: User | null
-}
-
 const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([])
-  const [interns, setInterns] = useState<InternProfile[]>([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<'users' | 'intern_mapping'>('users')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
 
-  // Form states
-  const [userForm, setUserForm] = useState({ name: '', email: '', role: 'intern', password: '' })
-  
+  // Form state
+  const [userForm, setUserForm] = useState({
+    name: '',
+    email: '',
+    employee_id: '',
+    role: 'intern',
+    password: ''
+  })
+
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [uRes, iRes] = await Promise.all([
-        api.get('/users'),
-        api.get('/interns')
-      ])
-      setUsers(uRes.data)
-      setInterns(iRes.data)
+      const uRes = await api.get('/users')
+      setUsers(uRes.data || [])
     } catch (err) {
       console.error(err)
     } finally {
@@ -52,12 +44,16 @@ const UsersPage: React.FC = () => {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    setErrorMsg('')
+    setSuccessMsg('')
     try {
       await api.post('/users', userForm)
-      setUserForm({ name: '', email: '', role: 'intern', password: '' })
+      setSuccessMsg(`User ${userForm.name} (${userForm.employee_id}) created successfully!`)
+      setUserForm({ name: '', email: '', employee_id: '', role: 'intern', password: '' })
       fetchData()
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Error creating user')
+      const errDetail = err.response?.data?.error || 'Failed to create user.'
+      setErrorMsg(errDetail)
     }
   }
 
@@ -71,146 +67,213 @@ const UsersPage: React.FC = () => {
     }
   }
 
-  const assignManager = async (internId: number, managerId: string) => {
-    try {
-      await api.put(`/interns/${internId}`, { manager_id: managerId ? parseInt(managerId) : null })
-      fetchData()
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  const managers = users.filter(u => u.role === 'manager' && u.status === 'active')
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setView('users')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'users' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}>
-            <div className="flex items-center gap-2"><UserPlus size={16} /> User Management</div>
-          </button>
-          <button onClick={() => setView('intern_mapping')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'intern_mapping' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}>
-            <div className="flex items-center gap-2"><UsersIcon size={16} /> Intern Assignments</div>
-          </button>
+      {/* Header Banner */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-white tracking-tight flex items-center gap-2.5">
+            <UserPlus className="text-blue-600 dark:text-blue-400" size={24} />
+            User Management &amp; Provisioning
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Create and manage application accounts (Interns and HR admins) with mandatory unique Employee IDs.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs px-3.5 py-2 rounded-xl font-bold border border-slate-200 dark:border-slate-700">
+            Total Accounts: <strong className="text-blue-600 dark:text-blue-400">{users.length}</strong>
+          </span>
         </div>
       </div>
 
-      {loading ? (
-         <div className="flex justify-center p-10"><span className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></span></div>
-      ) : view === 'users' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Add User Form */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 sticky top-20">
-              <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                <Plus size={16} className="text-blue-600" /> Add New User
-              </h3>
-              <form onSubmit={handleAddUser} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Name *</label>
-                  <input type="text" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" required />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Email *</label>
-                  <input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" required />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Role *</label>
-                  <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 bg-white" required>
-                    <option value="intern">Intern</option>
-                    <option value="manager">Manager</option>
-                    <option value="hr">HR</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Temporary Password *</label>
-                  <input type="password" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" required minLength={8}/>
-                </div>
-                <button type="submit" className="w-full bg-blue-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-blue-700 transition-colors mt-2">Create User</button>
-              </form>
-            </div>
-          </div>
-          
-          {/* Users List */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="text-left font-medium text-slate-600 px-5 py-3">Name</th>
-                    <th className="text-left font-medium text-slate-600 px-5 py-3">Email</th>
-                    <th className="text-left font-medium text-slate-600 px-5 py-3">Role</th>
-                    <th className="text-center font-medium text-slate-600 px-5 py-3 w-24">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {users.map(u => (
-                    <tr key={u.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-3 font-medium text-slate-800">{u.name}</td>
-                      <td className="px-5 py-3 text-slate-600">{u.email}</td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
-                          u.role === 'hr' ? 'bg-purple-100 text-purple-700' :
-                          u.role === 'manager' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-                        }`}>{u.role}</span>
-                      </td>
-                      <td className="px-5 py-3 text-center">
-                         <button onClick={() => toggleUserStatus(u.id, u.status)} className="transition-colors">
-                          {u.status === 'active' ? <CheckCircle2 size={18} className="text-green-500 hover:text-red-500" /> : <XCircle size={18} className="text-slate-300 hover:text-green-500" />}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Add User Form */}
+        <div className="lg:col-span-1">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200/80 dark:border-slate-800 p-6 sticky top-20">
+            <h2 className="text-base font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+              <Plus size={18} className="text-blue-600 dark:text-blue-400" />
+              Add New User / Intern
+            </h2>
+
+            {errorMsg && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/60 rounded-xl text-xs flex items-center gap-2 font-medium">
+                <AlertCircle size={15} className="flex-shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 rounded-xl text-xs flex items-center gap-2 font-medium">
+                <CheckCircle2 size={15} className="flex-shrink-0" />
+                <span>{successMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAddUser} className="space-y-4">
+              <div>
+                <label htmlFor="user-full-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="user-full-name"
+                  name="userFullName"
+                  type="text"
+                  value={userForm.name}
+                  onChange={e => setUserForm({ ...userForm, name: e.target.value })}
+                  placeholder="e.g. Suma Tirunamala"
+                  className="w-full h-11 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl px-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="user-employee-id" className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  Employee ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="user-employee-id"
+                  name="userEmployeeId"
+                  type="text"
+                  value={userForm.employee_id}
+                  onChange={e => setUserForm({ ...userForm, employee_id: e.target.value })}
+                  placeholder="e.g. INT-2026-001 or HR-WS-001"
+                  className="w-full h-11 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl px-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="user-email-addr" className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="user-email-addr"
+                  name="userEmailAddr"
+                  type="email"
+                  value={userForm.email}
+                  onChange={e => setUserForm({ ...userForm, email: e.target.value })}
+                  placeholder="e.g. intern@wscs.ai"
+                  className="w-full h-11 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl px-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="user-role-select" className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  Application Role <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="user-role-select"
+                  name="userRoleSelect"
+                  value={userForm.role}
+                  onChange={e => setUserForm({ ...userForm, role: e.target.value })}
+                  className="w-full h-11 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl px-3.5 text-sm text-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+                  required
+                >
+                  <option value="intern">Intern</option>
+                  <option value="hr">HR Administrator</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="user-password-input" className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  Initial Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="user-password-input"
+                  name="userPasswordInput"
+                  type="password"
+                  value={userForm.password}
+                  onChange={e => setUserForm({ ...userForm, password: e.target.value })}
+                  placeholder="At least 6 characters"
+                  className="w-full h-11 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl px-3.5 text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <button
+                type="submit"
+                id="btn-submit-create-user"
+                name="btnSubmitCreateUser"
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs shadow-blue-600/30 mt-2"
+              >
+                Create Account
+              </button>
+            </form>
           </div>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-           <h3 className="text-sm font-semibold text-slate-800 mb-4">Assign Interns to Managers</h3>
-           <div className="overflow-x-auto">
-             <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="text-left font-medium text-slate-600 px-5 py-3">Intern Name</th>
-                    <th className="text-left font-medium text-slate-600 px-5 py-3">Email</th>
-                    <th className="text-left font-medium text-slate-600 px-5 py-3">Assigned Manager</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {interns.map(intern => (
-                    <tr key={intern.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-3 font-medium text-slate-800">{intern.user.name}</td>
-                      <td className="px-5 py-3 text-slate-600">{intern.user.email}</td>
-                      <td className="px-5 py-3">
-                        <select 
-                          value={intern.manager_id || ''} 
-                          onChange={(e) => assignManager(intern.id, e.target.value)}
-                          className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 bg-white"
-                        >
-                          <option value="">Unassigned</option>
-                          {managers.map(m => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
-                          ))}
-                        </select>
-                      </td>
+
+        {/* Users List */}
+        <div className="lg:col-span-2">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+            {loading ? (
+              <div className="py-20 text-center">
+                <div className="w-8 h-8 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Loading accounts…</p>
+              </div>
+            ) : users.length === 0 ? (
+              <div className="py-16 text-center">
+                <p className="text-base font-semibold text-slate-700 dark:text-slate-300">No users found</p>
+                <p className="text-xs text-slate-400 mt-1">Create your first account using the form on the left.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
+                      <th className="px-6 py-4">Name</th>
+                      <th className="px-4 py-4">Employee ID</th>
+                      <th className="px-4 py-4">Email</th>
+                      <th className="px-4 py-4">Role</th>
+                      <th className="px-6 py-4 text-center">Status</th>
                     </tr>
-                  ))}
-                  {interns.length === 0 && (
-                     <tr><td colSpan={3} className="px-5 py-8 text-center text-slate-400">No interns found.</td></tr>
-                  )}
-                </tbody>
-             </table>
-           </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {users.map(u => (
+                      <tr key={u.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-800 dark:text-white text-sm">{u.name}</td>
+                        <td className="px-4 py-4 font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">{u.employee_id || `EMP-${String(u.id).padStart(4, '0')}`}</td>
+                        <td className="px-4 py-4 text-slate-600 dark:text-slate-300 font-medium">{u.email}</td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border ${
+                            u.role === 'hr'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-900/60'
+                              : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/60'
+                          }`}>
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => toggleUserStatus(u.id, u.status)}
+                            className="transition-colors"
+                            title={u.status === 'active' ? 'Deactivate Account' : 'Activate Account'}
+                          >
+                            {u.status === 'active' ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                                <CheckCircle2 size={18} />
+                                Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500 font-bold">
+                                <XCircle size={18} />
+                                Inactive
+                              </span>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
