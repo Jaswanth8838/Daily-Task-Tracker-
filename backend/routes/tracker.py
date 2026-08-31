@@ -61,7 +61,7 @@ def save_daily_tracker_draft():
     access_status = evaluate_intern_access(user)
     if access_status == 'BLOCKED':
         return jsonify({
-            'error': 'Tracker Access is BLOCKED. You missed one or more daily updates. Contact HR/Admin to restore access.'
+            'error': 'Tracker Access is BLOCKED. Your daily task was not submitted before the 11:59 PM deadline. Contact HR/Admin to restore access.'
         }), 403
 
     data = request.get_json(silent=True) or {}
@@ -72,11 +72,14 @@ def save_daily_tracker_draft():
         except ValueError:
             pass
 
+    if entry_date > today:
+        return jsonify({'error': 'Cannot create or submit daily trackers for future dates.'}), 403
+    if entry_date < today:
+        return jsonify({'error': 'Cannot save draft for an expired past date.'}), 403
+
     try:
         tracker = DailyTracker.query.filter_by(user_id=user_id, date=entry_date).first()
         if not tracker:
-            if entry_date < today:
-                return jsonify({'error': 'Cannot save draft for an expired past date.'}), 403
             tracker = DailyTracker(user_id=user_id, date=entry_date, status='draft')
             db.session.add(tracker)
             db.session.flush()
@@ -240,7 +243,7 @@ def submit_daily_tracker():
     access_status = evaluate_intern_access(user)
     if access_status == 'BLOCKED':
         return jsonify({
-            'error': 'Tracker Access is BLOCKED. You missed one or more daily updates. Contact HR/Admin to restore access.'
+            'error': 'Tracker Access is BLOCKED. Your daily task was not submitted before the 11:59 PM deadline. Contact HR/Admin to restore access.'
         }), 403
 
     data = request.get_json(silent=True) or {}
@@ -251,11 +254,14 @@ def submit_daily_tracker():
         except ValueError:
             pass
 
+    if target_date > today:
+        return jsonify({'error': 'Cannot create or submit daily trackers for future dates.'}), 403
+    if target_date < today:
+        return jsonify({'error': 'Cannot submit for an expired past date.'}), 403
+
     try:
         tracker = DailyTracker.query.filter_by(user_id=user_id, date=target_date).first()
         if not tracker:
-            if target_date < today:
-                return jsonify({'error': 'Cannot submit for an expired past date.'}), 403
             tracker = DailyTracker(user_id=user_id, date=target_date, status='draft')
             db.session.add(tracker)
             db.session.flush()

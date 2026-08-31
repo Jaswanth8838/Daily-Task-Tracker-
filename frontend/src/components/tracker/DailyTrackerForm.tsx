@@ -493,11 +493,18 @@ const DailyTrackerForm: React.FC<DailyTrackerFormProps> = ({
 
       {/* Blocked / Frozen Notice */}
       {isBlocked && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 text-xs text-red-700 font-medium">
-          <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
-          <p>
-            Your daily tracker access is <span className="font-bold uppercase">BLOCKED</span>. You missed one or more past daily updates. Please contact HR/Admin to grant access.
-          </p>
+        <div className="bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 text-slate-800 dark:text-slate-100">
+          <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/80 flex items-center justify-center text-red-600 dark:text-red-400 flex-shrink-0">
+            <AlertCircle size={22} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-red-700 dark:text-red-400 uppercase tracking-wider">Tracker Access: BLOCKED</span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+              Your daily task was not submitted before the 11:59 PM deadline. Your tracker access has been temporarily blocked. Please contact HR/Admin to restore access.
+            </p>
+          </div>
         </div>
       )}
 
