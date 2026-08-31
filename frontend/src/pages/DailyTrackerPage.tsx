@@ -12,6 +12,7 @@ const DailyTrackerPage: React.FC = () => {
     is_blocked: boolean
     is_frozen: boolean
     is_submitted: boolean
+    missed_date?: string | null
   } | null>(null)
 
   const fetchTodayState = async () => {
@@ -38,14 +39,14 @@ const DailyTrackerPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Daily Tracker</h1>
-          <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Daily Tracker</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
             <Calendar size={15} />
             {todayStr}
           </p>
         </div>
         {trackerState?.is_submitted && (
-          <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-semibold">
+          <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-400 text-sm font-semibold">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             Submitted for Today
           </span>
@@ -59,6 +60,7 @@ const DailyTrackerPage: React.FC = () => {
         isBlocked={trackerState?.is_blocked || false}
         isFrozen={trackerState?.is_frozen || false}
         isSubmitted={trackerState?.is_submitted || false}
+        missedDate={trackerState?.missed_date}
         onUpdateSaved={handleRefresh}
       />
     </div>

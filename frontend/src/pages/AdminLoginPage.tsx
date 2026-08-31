@@ -140,11 +140,21 @@ const AdminLoginPage: React.FC = () => {
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   title={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-200 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-200 transition-colors cursor-pointer"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+            </div>
+
+            {/* Forgot Password Link */}
+            <div className="flex justify-end pt-1">
+              <Link
+                to="/forgot-password"
+                className="text-xs sm:text-sm font-semibold text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                Forgot Password?
+              </Link>
             </div>
 
             <button
@@ -152,7 +162,7 @@ const AdminLoginPage: React.FC = () => {
               id="btn-admin-login-submit"
               name="btnAdminLoginSubmit"
               disabled={loading}
-              className="w-full h-12 sm:h-[52px] bg-purple-600 hover:bg-purple-700 disabled:bg-purple-900/50 text-white font-bold rounded-xl text-base transition-all shadow-md shadow-purple-900/30 flex items-center justify-center gap-2 mt-4"
+              className="w-full h-12 sm:h-[52px] bg-purple-600 hover:bg-purple-700 disabled:bg-purple-900/50 text-white font-bold rounded-xl text-base transition-all shadow-md shadow-purple-900/30 flex items-center justify-center gap-2 mt-4 cursor-pointer"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

@@ -37,6 +37,17 @@ def get_today_tracker():
         db.session.add(tracker)
         db.session.commit()
 
+    # Find latest missed/frozen date if blocked
+    latest_missed_date = None
+    if access_status == 'BLOCKED':
+        frozen_tracker = DailyTracker.query.filter(
+            DailyTracker.user_id == user_id,
+            DailyTracker.status.in_(['frozen', 'missed']),
+            DailyTracker.date < today
+        ).order_by(DailyTracker.date.desc()).first()
+        if frozen_tracker:
+            latest_missed_date = frozen_tracker.date.isoformat()
+
     session_count = len(tracker.sessions)
     next_session_name = f"Session {session_count + 1}"
 
@@ -45,8 +56,9 @@ def get_today_tracker():
         'tracker': tracker.to_dict(),
         'access_status': access_status,
         'is_blocked': access_status == 'BLOCKED',
-        'is_frozen': tracker.status in ('frozen', 'missed'),
+        'is_frozen': tracker.status in ('frozen', 'missed') or access_status == 'BLOCKED',
         'is_submitted': tracker.status == 'submitted',
+        'missed_date': latest_missed_date,
         'next_session_name': next_session_name
     }), 200
 
@@ -173,11 +185,15 @@ def create_daily_update():
         except ValueError:
             pass
 
+    if entry_date > today:
+        return jsonify({'error': 'Cannot create or save trackers for future dates.'}), 403
+
+    if entry_date < today:
+        return jsonify({'error': 'Cannot submit an update for an expired past date.'}), 403
+
     try:
         tracker = DailyTracker.query.filter_by(user_id=user_id, date=entry_date).first()
         if not tracker:
-            if entry_date < today:
-                return jsonify({'error': 'Cannot submit an update for an expired past date.'}), 403
             tracker = DailyTracker(user_id=user_id, date=entry_date, status='draft')
             db.session.add(tracker)
             db.session.flush()
@@ -398,6 +414,14 @@ def admin_get_tracker_access_list():
             intern_id=intern.id
         ).order_by(TrackerAccessOverride.created_at.desc()).first()
 
+        if access_status == 'BLOCKED' and latest_frozen:
+            formatted_frozen_date = latest_frozen.date.strftime('%d-%b-%Y')
+            reason_text = latest_override.reason if (latest_override and latest_override.action == 'REVOKE') else f"Daily task not submitted before deadline for {formatted_frozen_date}"
+        elif latest_override:
+            reason_text = latest_override.reason
+        else:
+            reason_text = "Normal operation"
+
         result.append({
             'intern_id': intern.id,
             'intern_name': intern.name,
@@ -406,12 +430,10 @@ def admin_get_tracker_access_list():
             'manager_name': intern_profile.manager.name if (intern_profile and intern_profile.manager) else 'Unassigned',
             'department': intern.department or '—',
             'tracker_access_status': access_status,
-            'last_submission_date': last_submitted.date.isoformat() if last_submitted else 'None',
-            'frozen_date': latest_frozen.date.isoformat() if latest_frozen else None,
-            'frozen_status': latest_frozen.status if latest_frozen else None,
-            'latest_reason': latest_override.reason if latest_override else (
-                f"Missed update for {latest_frozen.date.isoformat()}" if latest_frozen else "Normal operation"
-            )
+            'last_submission_date': last_submitted.date.strftime('%d-%b-%Y') if last_submitted else 'None',
+            'frozen_date': latest_frozen.date.strftime('%d-%b-%Y') if latest_frozen else None,
+            'frozen_status': latest_frozen.status.upper() if latest_frozen else None,
+            'latest_reason': reason_text
         })
 
     return jsonify(result), 200

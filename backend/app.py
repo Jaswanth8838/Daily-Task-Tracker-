@@ -11,7 +11,7 @@ migrate = Migrate()
 def create_app():
     app = Flask(__name__)
 
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'sqlite:///tasktracker.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     jwt_secret = os.environ.get('JWT_SECRET_KEY')

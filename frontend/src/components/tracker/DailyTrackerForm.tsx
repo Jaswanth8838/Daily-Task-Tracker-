@@ -42,6 +42,7 @@ interface DailyTrackerFormProps {
   isBlocked?: boolean
   isFrozen?: boolean
   isSubmitted?: boolean
+  missedDate?: string | null
   onUpdateSaved?: () => void
 }
 
@@ -68,6 +69,7 @@ const DailyTrackerForm: React.FC<DailyTrackerFormProps> = ({
   isBlocked = false,
   isFrozen = false,
   isSubmitted = false,
+  missedDate,
   onUpdateSaved,
 }) => {
   const [trainers, setTrainers] = useState<Trainer[]>([])
@@ -493,16 +495,21 @@ const DailyTrackerForm: React.FC<DailyTrackerFormProps> = ({
 
       {/* Blocked / Frozen Notice */}
       {isBlocked && (
-        <div className="bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 text-slate-800 dark:text-slate-100">
-          <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/80 flex items-center justify-center text-red-600 dark:text-red-400 flex-shrink-0">
-            <AlertCircle size={22} />
+        <div className="bg-red-50 dark:bg-red-950/40 border-2 border-red-300 dark:border-red-850 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 text-red-800 dark:text-red-300 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/60 flex items-center justify-center shrink-0">
+            <AlertCircle size={26} className="text-red-600 dark:text-red-400" />
           </div>
-          <div>
+          <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-red-700 dark:text-red-400 uppercase tracking-wider">Tracker Access: BLOCKED</span>
+              <span className="font-extrabold text-xs tracking-wide bg-red-200/70 dark:bg-red-900/80 text-red-900 dark:text-red-200 px-2.5 py-0.5 rounded-md uppercase">
+                Tracker Access: BLOCKED
+              </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
-              Your daily task was not submitted before the 11:59 PM deadline. Your tracker access has been temporarily blocked. Please contact HR/Admin to restore access.
+            <p className="text-sm font-bold text-red-900 dark:text-red-100 pt-0.5">
+              Your daily task for {missedDate ? new Date(missedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-') : 'the previous date'} was not submitted before the 11:59 PM deadline.
+            </p>
+            <p className="text-xs text-red-700 dark:text-red-300">
+              Your tracker access has been temporarily blocked. Please contact HR/Admin to restore access.
             </p>
           </div>
         </div>

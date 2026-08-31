@@ -139,41 +139,52 @@ const TrackerAccessManager: React.FC = () => {
           <thead>
             <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold text-left uppercase tracking-wider">
               <th className="pb-3 pr-3">Intern Profile</th>
-              <th className="pb-3 pr-3">Status</th>
-              <th className="pb-3 pr-3">Last Submission</th>
+              <th className="pb-3 pr-3">Missed Date</th>
+              <th className="pb-3 pr-3">Tracker Status</th>
+              <th className="pb-3 pr-3">Access Status</th>
               <th className="pb-3 pr-3">Reason / Details</th>
               <th className="pb-3 text-right">Access Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {filteredRecords.map((r) => {
               const isBlocked = r.tracker_access_status === 'BLOCKED'
               return (
-                <tr key={r.intern_id} className="hover:bg-slate-50/70 transition-colors">
+                <tr key={r.intern_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                   <td className="py-3 pr-3">
-                    <div className="font-bold text-slate-800">{r.intern_name}</div>
+                    <div className="font-bold text-slate-800 dark:text-slate-100">{r.intern_name}</div>
                     <div className="text-[11px] text-slate-400 font-normal">
-                      {r.intern_email} • <span className="font-medium text-slate-600">{r.employee_id}</span>
+                      {r.intern_email} • <span className="font-semibold text-blue-600 dark:text-blue-400">{r.employee_id}</span>
                     </div>
                   </td>
-                  <td className="py-3 pr-3 text-slate-600 font-medium">
-                    {r.manager_name}
+                  <td className="py-3 pr-3 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
+                    {r.frozen_date || '—'}
+                  </td>
+                  <td className="py-3 pr-3">
+                    {r.frozen_status ? (
+                      <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-bold ${
+                        r.frozen_status === 'FROZEN' || r.frozen_status === 'MISSED'
+                          ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60'
+                          : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60'
+                      }`}>
+                        {r.frozen_status}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
                   </td>
                   <td className="py-3 pr-3">
                     {isBlocked ? (
-                      <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 text-[11px] px-2 py-0.5 rounded-md font-bold">
+                      <span className="inline-flex items-center gap-1 bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/60 text-[11px] px-2.5 py-0.5 rounded-md font-extrabold">
                         <ShieldAlert size={12} /> BLOCKED
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] px-2 py-0.5 rounded-md font-bold">
+                      <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60 text-[11px] px-2.5 py-0.5 rounded-md font-bold">
                         <ShieldCheck size={12} /> ACTIVE
                       </span>
                     )}
                   </td>
-                  <td className="py-3 pr-3 text-slate-600 font-medium whitespace-nowrap">
-                    {r.last_submission_date}
-                  </td>
-                  <td className="py-3 pr-3 text-slate-600 max-w-[200px] truncate" title={r.latest_reason}>
+                  <td className="py-3 pr-3 text-slate-600 dark:text-slate-300 max-w-[240px] truncate" title={r.latest_reason}>
                     {r.latest_reason}
                   </td>
                   <td className="py-3 text-right">
@@ -181,7 +192,7 @@ const TrackerAccessManager: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleOpenModal(r, 'grant')}
-                        className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-2.5 py-1 rounded-md text-[11px] transition-colors shadow-sm shadow-emerald-600/20"
+                        className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-colors shadow-sm shadow-emerald-600/20 active:scale-95"
                       >
                         <Unlock size={12} />
                         Grant Access
@@ -190,7 +201,7 @@ const TrackerAccessManager: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleOpenModal(r, 'revoke')}
-                        className="inline-flex items-center gap-1 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-700 border border-slate-200 font-semibold px-2.5 py-1 rounded-md text-[11px] transition-colors"
+                        className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-600 dark:text-slate-300 hover:text-red-700 dark:hover:text-red-400 border border-slate-200 dark:border-slate-700 font-semibold px-2.5 py-1.5 rounded-xl text-xs transition-colors"
                       >
                         <Lock size={12} />
                         Revoke Access
@@ -202,7 +213,7 @@ const TrackerAccessManager: React.FC = () => {
             })}
             {filteredRecords.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
+                <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
                   No interns found matching filter.
                 </td>
               </tr>
@@ -213,38 +224,38 @@ const TrackerAccessManager: React.FC = () => {
 
       {/* Confirmation Modal */}
       {modalOpen && selectedIntern && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 border border-slate-200">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-xl ${modalAction === 'grant' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                <div className={`p-2 rounded-xl ${modalAction === 'grant' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300'}`}>
                   {modalAction === 'grant' ? <Unlock size={18} /> : <Lock size={18} />}
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 text-sm">
+                  <h3 className="font-bold text-slate-800 dark:text-white text-sm">
                     {modalAction === 'grant' ? 'Grant Tracker Re-Access' : 'Revoke Tracker Access'}
                   </h3>
-                  <p className="text-xs text-slate-500">{selectedIntern.intern_name} ({selectedIntern.intern_email})</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{selectedIntern.intern_name} ({selectedIntern.intern_email})</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
               >
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                 {modalAction === 'grant'
-                  ? 'Granting access restores the intern’s capability to submit today’s and future daily trackers. This action will be logged in the audit trail.'
+                  ? 'Granting access restores the intern’s capability to submit today’s and future daily trackers. Historical missed dates remain frozen unless explicitly reopened. This action is logged in the audit trail.'
                   : 'Revoking access blocks the intern from submitting further daily updates until explicitly re-granted by HR/Admin.'}
               </p>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Reason for Override <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -253,7 +264,7 @@ const TrackerAccessManager: React.FC = () => {
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   placeholder="State the justification, approved leave, or administrative rationale..."
-                  className="w-full border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-600 resize-none"
+                  className="w-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl p-2.5 text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-600 resize-none"
                 />
               </div>
 
@@ -261,7 +272,7 @@ const TrackerAccessManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   Cancel
                 </button>
@@ -269,7 +280,7 @@ const TrackerAccessManager: React.FC = () => {
                   type="button"
                   disabled={actionLoading || !reason.trim()}
                   onClick={handleConfirmAction}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors flex items-center gap-1.5 ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors flex items-center gap-1.5 ${
                     modalAction === 'grant'
                       ? 'bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-600/20'
                       : 'bg-red-600 hover:bg-red-700 shadow-sm shadow-red-600/20'

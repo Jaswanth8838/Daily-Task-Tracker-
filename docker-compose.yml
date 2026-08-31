@@ -20,11 +20,23 @@ services:
       context: ./backend
     ports:
       - "5000:5000"
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-tasktracker_user}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-tasktracker}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-default_secret_please_change}
       - APP_TIMEZONE=${APP_TIMEZONE:-Asia/Kolkata}
-      - DAILY_CUTOFF_TIME=${DAILY_CUTOFF_TIME:-23:59}
+      - DAILY_CUTOFF_TIME=${DAILY_CUTOFF_TIME:-23:59:59}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-${SMTP_USER:-}}
+      - SMTP_USER=${SMTP_USER:-${SMTP_USERNAME:-}}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+      - SMTP_USE_SSL=${SMTP_USE_SSL:-false}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-${SMTP_FROM:-Daily Task Tracker <noreply@wscs.ai>}}
+      - SMTP_FROM=${SMTP_FROM:-${SMTP_FROM_EMAIL:-Daily Task Tracker <noreply@wscs.ai>}}
     depends_on:
       postgres:
         condition: service_healthy

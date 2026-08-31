@@ -4,8 +4,9 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify, g, current_app
 from app import db
-from models import User, Intern, AuditLog, PasswordResetToken
+from models import User, Intern, AuditLog, PasswordResetToken, Notification
 from middleware import auth_required
+from services.email_service import send_password_reset_email
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -95,22 +96,35 @@ def forgot_password():
     if not email:
         return jsonify({'error': 'Corporate email is required'}), 400
 
-    generic_msg = 'If an account exists for this email, password reset instructions will be sent.'
+    generic_msg = 'If an account exists for this email, a password reset link has been sent.'
 
     user = User.query.filter_by(email=email, status='active').first()
-    dev_token = None
     if user:
+        # Invalidate previous unused reset tokens for this user
         PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({'used': True})
 
-        token_str = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(hours=1)
+        # Generate secure cryptographically random 32-byte token
+        raw_token = secrets.token_urlsafe(32)
+        hashed_token = PasswordResetToken.hash_token(raw_token)
+        expires_at = datetime.utcnow() + timedelta(minutes=30)
+
         reset_token = PasswordResetToken(
             user_id=user.id,
-            token=token_str,
+            token_hash=hashed_token,
+            token=hashed_token,
             expires_at=expires_at
         )
         db.session.add(reset_token)
 
+        # In-app security notification
+        notif = Notification(
+            user_id=user.id,
+            title="Password Reset Request",
+            message=f"A password reset request was initiated for your account ({user.email}). Please check your email to reset your password."
+        )
+        db.session.add(notif)
+
+        # Audit log
         log = AuditLog(
             user_name=user.name,
             user_role=user.role,
@@ -119,37 +133,88 @@ def forgot_password():
         )
         db.session.add(log)
         db.session.commit()
-        dev_token = token_str
 
-    res = {'message': generic_msg}
-    if dev_token:
-        res['dev_reset_token'] = dev_token
+        # Dispatch real email containing the reset link ONLY (never a password)
+        send_password_reset_email(user.email, user.name, raw_token)
 
-    return jsonify(res), 200
+    # Always return ONLY the generic message (no token, no password)
+    return jsonify({'message': generic_msg}), 200
+
+
+@auth_bp.route('/api/auth/verify-reset-token/<token>', methods=['GET'])
+def verify_reset_token(token):
+    token_str = (token or '').strip()
+    if not token_str:
+        return jsonify({'error': 'Invalid password reset link.'}), 400
+
+    hashed_token = PasswordResetToken.hash_token(token_str)
+    reset_token = PasswordResetToken.query.filter(
+        (PasswordResetToken.token_hash == hashed_token) |
+        (PasswordResetToken.token == token_str) |
+        (PasswordResetToken.token == hashed_token)
+    ).first()
+
+    if not reset_token:
+        return jsonify({'error': 'Invalid password reset link.'}), 400
+
+    if reset_token.is_already_used():
+        return jsonify({'error': 'This password reset link has already been used.'}), 400
+
+    if reset_token.is_expired():
+        return jsonify({'error': 'This password reset link has expired.'}), 400
+
+    return jsonify({
+        'valid': True,
+        'email': reset_token.user.email if reset_token.user else None
+    }), 200
 
 
 @auth_bp.route('/api/auth/reset-password', methods=['POST'])
 def reset_password():
     data = request.get_json(silent=True) or {}
     token_str = (data.get('token') or '').strip()
-    new_password = data.get('password') or ''
+    new_password = data.get('newPassword') or data.get('password') or ''
+    confirm_password = data.get('confirmPassword')
 
-    if not token_str or not new_password:
-        return jsonify({'error': 'Reset token and new password are required'}), 400
+    if not token_str:
+        return jsonify({'error': 'Invalid password reset link.'}), 400
+
+    if not new_password:
+        return jsonify({'error': 'New password is required'}), 400
+
+    if confirm_password is not None and new_password != confirm_password:
+        return jsonify({'error': 'Passwords do not match. Please try again.'}), 400
 
     if len(new_password) < 6:
         return jsonify({'error': 'Password must be at least 6 characters long'}), 400
 
-    reset_token = PasswordResetToken.query.filter_by(token=token_str, used=False).first()
-    if not reset_token or not reset_token.is_valid():
-        return jsonify({'error': 'Invalid or expired password reset link'}), 400
+    hashed_token = PasswordResetToken.hash_token(token_str)
+    reset_token = PasswordResetToken.query.filter(
+        (PasswordResetToken.token_hash == hashed_token) |
+        (PasswordResetToken.token == token_str) |
+        (PasswordResetToken.token == hashed_token)
+    ).first()
+
+    if not reset_token:
+        return jsonify({'error': 'Invalid password reset link.'}), 400
+
+    if reset_token.is_already_used():
+        return jsonify({'error': 'This password reset link has already been used.'}), 400
+
+    if reset_token.is_expired():
+        return jsonify({'error': 'This password reset link has expired.'}), 400
 
     user = reset_token.user
     if not user or user.status != 'active':
         return jsonify({'error': 'User account is no longer active'}), 400
 
+    # Securely hash and update the password
     user.set_password(new_password)
     reset_token.used = True
+    reset_token.used_at = datetime.utcnow()
+
+    # Invalidate any other pending reset tokens for this user
+    PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({'used': True})
 
     log = AuditLog(
         user_name=user.name,

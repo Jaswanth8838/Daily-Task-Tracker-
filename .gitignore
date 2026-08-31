@@ -2,9 +2,14 @@
 __pycache__/
 *.pyc
 venv/
+.venv/
+.pytest_cache/
+instance/
+*.db
 .env
 
 # Node
 node_modules/
 dist/
 .DS_Store
+

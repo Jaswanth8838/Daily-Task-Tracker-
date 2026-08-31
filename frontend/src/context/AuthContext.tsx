@@ -5,7 +5,7 @@ export interface User {
   id: number
   name: string
   email: string
-  role: 'intern' | 'hr' | 'admin'
+  role: 'intern' | 'hr' | 'admin' | 'manager' | 'employee'
   status: string
 }
 

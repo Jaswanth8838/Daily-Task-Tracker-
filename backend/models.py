@@ -468,13 +468,30 @@ class PasswordResetToken(db.Model):
     __tablename__ = 'password_reset_tokens'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    token = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    token = db.Column(db.String(128), nullable=True, index=True)
+    token_hash = db.Column(db.String(128), unique=True, nullable=True, index=True)
     used = db.Column(db.Boolean, default=False, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user = db.relationship('User', foreign_keys=[user_id])
 
-    def is_valid(self):
+    @staticmethod
+    def hash_token(raw_token: str) -> str:
+        """Compute SHA-256 hash of a raw token."""
+        import hashlib
+        return hashlib.sha256(raw_token.strip().encode('utf-8')).hexdigest()
+
+    def is_valid(self) -> bool:
+        """Checks if the token is unused and not expired."""
         return not self.used and self.expires_at > datetime.utcnow()
+
+    def is_expired(self) -> bool:
+        """Checks if the token has expired."""
+        return self.expires_at <= datetime.utcnow()
+
+    def is_already_used(self) -> bool:
+        """Checks if the token has already been consumed."""
+        return bool(self.used)
 
