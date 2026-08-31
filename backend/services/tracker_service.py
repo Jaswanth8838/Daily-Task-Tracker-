@@ -85,14 +85,13 @@ def evaluate_intern_access(user: User) -> str:
     # 4. Check for active admin overrides
     if past_unsubmitted_dates:
         latest_missed_date = max(past_unsubmitted_dates)
-        # Check if there is a GRANT override created on or after the latest missed event
+        # Check if there is a GRANT override created for this intern
         active_grant = TrackerAccessOverride.query.filter(
             TrackerAccessOverride.intern_id == user.id,
-            TrackerAccessOverride.action == 'GRANT',
-            TrackerAccessOverride.effective_from <= today
+            TrackerAccessOverride.action == 'GRANT'
         ).order_by(TrackerAccessOverride.created_at.desc()).first()
 
-        if active_grant and active_grant.created_at.date() >= latest_missed_date:
+        if active_grant and (active_grant.created_at.date() >= latest_missed_date or active_grant.effective_from >= latest_missed_date):
             user.tracker_access_status = 'ACTIVE'
         else:
             user.tracker_access_status = 'BLOCKED'
