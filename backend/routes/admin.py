@@ -30,42 +30,36 @@ def _log(action, record_id=None, table=None, old=None, new=None, details=None):
 @admin_bp.route('/api/admin/dashboard/stats', methods=['GET'])
 @admin_required
 def admin_dashboard_stats():
+    """HR KPI stats from real DailyTracker data."""
     today = get_today_local()
-    total_users = User.query.count()
-    active_employees = User.query.filter(
-        User.role == 'employee', User.status == 'active'
-    ).count()
+
+    total_users    = User.query.count()
     active_interns = User.query.filter_by(role='intern', status='active').count()
 
-    emp_today = EmployeeDailyReport.query.filter_by(date=today).count()
-    intern_today = InternDailyReport.query.filter_by(date=today).count()
-    reports_today = emp_today + intern_today
+    # Submitted today — trackers where status='submitted' and date=today
+    submitted_today = DailyTracker.query.filter_by(date=today, status='submitted').count()
 
-    emp_completed = EmployeeDailyReport.query.filter_by(daily_status='completed').count()
-    intern_completed = InternDailyReport.query.filter_by(overall_status='completed').count()
-    completed_total = emp_completed + intern_completed
+    # Pending today — active interns who have NOT submitted today
+    pending_today = active_interns - submitted_today
+    if pending_today < 0:
+        pending_today = 0
 
-    emp_frozen = EmployeeDailyReport.query.filter_by(is_frozen=True).count()
-    intern_frozen = InternDailyReport.query.filter_by(is_frozen=True).count()
-    frozen_total = emp_frozen + intern_frozen
+    # All-time submitted trackers
+    completed_total = DailyTracker.query.filter_by(status='submitted').count()
 
-    emp_pending = EmployeeDailyReport.query.filter(
-        EmployeeDailyReport.date == today,
-        EmployeeDailyReport.daily_status.in_(['not_started', 'in_progress'])
-    ).count()
-    intern_pending = InternDailyReport.query.filter(
-        InternDailyReport.date == today,
-        InternDailyReport.overall_status.in_(['not_started', 'in_progress'])
+    # Frozen/missed trackers (blocked accounts)
+    frozen_total = User.query.filter_by(
+        role='intern', status='active', tracker_access_status='BLOCKED'
     ).count()
 
     return jsonify({
-        'total_users': total_users,
-        'active_employees': active_employees,
-        'active_interns': active_interns,
-        'reports_today': reports_today,
-        'pending_today': emp_pending + intern_pending,
-        'completed_total': completed_total,
-        'frozen_total': frozen_total,
+        'total_users':       total_users,
+        'active_employees':  0,
+        'active_interns':    active_interns,
+        'reports_today':     submitted_today,
+        'pending_today':     pending_today,
+        'completed_total':   completed_total,
+        'frozen_total':      frozen_total,
     }), 200
 
 

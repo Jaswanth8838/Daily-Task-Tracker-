@@ -103,7 +103,7 @@ const AppLayout: React.FC = () => {
             </Routes>
           </div>
           <footer className="flex items-center justify-between px-8 py-6 text-sm text-slate-500 dark:text-slate-400 border-t border-slate-200/60 dark:border-slate-800/80 mt-8">
-            <span>© 2025 Task Tracker. All rights reserved.</span>
+            <span>© 2026 Task Tracker. All rights reserved.</span>
             <span>Version 1.0.0</span>
           </footer>
         </main>

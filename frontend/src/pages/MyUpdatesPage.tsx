@@ -32,7 +32,11 @@ const MyUpdatesPage: React.FC = () => {
   const fetchMyUpdates = useCallback(async () => {
     try {
       const res = await api.get('/tracker/my-updates')
-      setUpdates(res.data || [])
+      const payload = res.data?.data || res.data
+      const list = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.updates) ? payload.updates : [])
+      setUpdates(list)
     } catch (err) {
       console.error('Failed to fetch my updates', err)
     } finally {

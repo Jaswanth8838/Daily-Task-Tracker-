@@ -18,7 +18,7 @@ const DailyTrackerPage: React.FC = () => {
   const fetchTodayState = async () => {
     try {
       const res = await api.get('/tracker/today')
-      setTrackerState(res.data)
+      setTrackerState(res.data?.data || res.data)
     } catch (err) {
       console.error('Failed to fetch today tracker state', err)
     }
