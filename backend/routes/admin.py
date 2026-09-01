@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, g
 from app import db
 from models import (
     User, EmployeeDailyReport, InternDailyReport,
-    AuditLog, get_today_local
+    AuditLog, get_today_local, DailyTracker, DailyUpdate
 )
 from middleware import admin_required
 from sqlalchemy import or_
@@ -73,126 +73,58 @@ def admin_dashboard_stats():
 @admin_bp.route('/api/admin/dashboard/intern-overview', methods=['GET'])
 @admin_required
 def admin_intern_overview():
-    """Returns per-intern today's status, section breakdown, submission state, lacking areas."""
+    """Returns per-intern today's status, sessions submitted, and last submitted date/time for HR Home Page."""
     today = get_today_local()
-
-    # All active interns
     interns = User.query.filter_by(role='intern', status='active').all()
 
-    # Today's intern reports keyed by user_id
-    today_reports = {
-        r.user_id: r
-        for r in InternDailyReport.query.filter_by(date=today).all()
-    }
-
-    # All intern reports (all time) for aggregate stats
-    all_reports = InternDailyReport.query.join(User, InternDailyReport.user_id == User.id).all()
-
-    # ── Per-intern rows ──
     intern_rows = []
-    submitted_today = 0
-    not_submitted_today = 0
+    submitted_today_count = 0
+    not_submitted_today_count = 0
 
     for intern in interns:
-        report = today_reports.get(intern.id)
-        submitted = report is not None
+        today_tracker = DailyTracker.query.filter_by(user_id=intern.id, date=today).first()
 
-        if submitted:
-            submitted_today += 1
-            report.check_and_freeze()
-            training_s = report.training_status or 'not_started'
-            meeting_s  = report.meeting_status  or 'not_started'
-            practice_s = report.practice_status or 'not_started'
-            overall_s  = report.overall_status  or report.compute_overall_status()
-            training_p = report.training_progress or 0
-            practice_p = report.practice_progress or 0
-            training_d = (report.training_details or '')[:120]
-            meeting_d  = (report.meeting_details or '')[:120]
-            practice_d = (report.practice_details or '')[:120]
+        is_submitted_today = False
+        sessions_count = 0
+
+        if today_tracker:
+            if today_tracker.status == 'submitted':
+                is_submitted_today = True
+                sessions_count = 3
+            else:
+                valid_sessions = [s for s in today_tracker.sessions if s.trainer_name and s.technology_name and s.update_text]
+                sessions_count = min(len(valid_sessions), 3)
+
+        if is_submitted_today:
+            submitted_today_count += 1
         else:
-            not_submitted_today += 1
-            training_s = meeting_s = practice_s = overall_s = 'not_submitted'
-            training_p = practice_p = 0
-            training_d = meeting_d = practice_d = ''
+            not_submitted_today_count += 1
 
-        # Lacking areas: any section that is blocked or not_started when others are further ahead
-        lacking = []
-        if submitted:
-            if training_s == 'blocked':  lacking.append('Training')
-            if meeting_s  == 'blocked':  lacking.append('Meeting')
-            if practice_s == 'blocked':  lacking.append('Practice')
-            if training_p < 30 and training_s not in ('completed',):
-                if 'Training' not in lacking: lacking.append('Training (low progress)')
-            if practice_p < 30 and practice_s not in ('completed',):
-                if 'Practice' not in lacking: lacking.append('Practice (low progress)')
+        last_tracker = DailyTracker.query.filter_by(user_id=intern.id, status='submitted').order_by(DailyTracker.updated_at.desc(), DailyTracker.date.desc()).first()
+
+        last_submitted_at = None
+        if last_tracker:
+            if last_tracker.updated_at:
+                last_submitted_at = last_tracker.updated_at.isoformat()
+            elif last_tracker.date:
+                last_submitted_at = datetime.combine(last_tracker.date, datetime.min.time()).isoformat()
 
         intern_rows.append({
             'id': intern.id,
             'name': intern.name,
             'email': intern.email,
-            'department': intern.department or '—',
-            'submitted_today': submitted,
-            'overall_status': overall_s,
-            'training_status': training_s,
-            'training_progress': training_p,
-            'training_details': training_d,
-            'meeting_status': meeting_s,
-            'meeting_details': meeting_d,
-            'practice_status': practice_s,
-            'practice_progress': practice_p,
-            'practice_details': practice_d,
-            'lacking_areas': lacking,
+            'submitted_today': is_submitted_today,
+            'sessions_submitted': f"{sessions_count}/3",
+            'sessions_count': sessions_count,
+            'last_submitted_at': last_submitted_at
         })
-
-    # ── Aggregate section stats (all time) ──
-    def status_counts(status_list):
-        from collections import Counter
-        c = Counter(status_list)
-        return {
-            'completed': c.get('completed', 0),
-            'in_progress': c.get('in_progress', 0),
-            'not_started': c.get('not_started', 0),
-            'blocked': c.get('blocked', 0),
-        }
-
-    training_statuses = [r.training_status or 'not_started' for r in all_reports]
-    meeting_statuses  = [r.meeting_status  or 'not_started' for r in all_reports]
-    practice_statuses = [r.practice_status or 'not_started' for r in all_reports]
-    overall_statuses  = [r.overall_status  or 'not_started' for r in all_reports]
-
-    # ── Department breakdown ──
-    from collections import Counter, defaultdict
-    dept_map = defaultdict(lambda: {'total': 0, 'submitted': 0, 'completed': 0, 'blocked': 0})
-    for intern in interns:
-        dept = intern.department or 'Unassigned'
-        dept_map[dept]['total'] += 1
-        if intern.id in today_reports:
-            dept_map[dept]['submitted'] += 1
-            r = today_reports[intern.id]
-            if r.overall_status == 'completed':
-                dept_map[dept]['completed'] += 1
-            if r.overall_status == 'blocked':
-                dept_map[dept]['blocked'] += 1
-
-    dept_breakdown = [
-        {'dept': k, **v} for k, v in dept_map.items()
-    ]
-
-    db.session.commit()
 
     return jsonify({
         'today': today.isoformat(),
         'total_interns': len(interns),
-        'submitted_today': submitted_today,
-        'not_submitted_today': not_submitted_today,
-        'intern_rows': intern_rows,
-        'aggregate': {
-            'training': status_counts(training_statuses),
-            'meeting':  status_counts(meeting_statuses),
-            'practice': status_counts(practice_statuses),
-            'overall':  status_counts(overall_statuses),
-        },
-        'dept_breakdown': dept_breakdown,
+        'submitted_today': submitted_today_count,
+        'not_submitted_today': not_submitted_today_count,
+        'intern_rows': intern_rows
     }), 200
 
 

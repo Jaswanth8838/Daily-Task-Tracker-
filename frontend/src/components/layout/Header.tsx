@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { Bell, ChevronDown, Menu, LogOut, User as UserIcon, Sun, Moon } from 'lucide-react'
+import { Bell, ChevronDown, Menu, LogOut, User as UserIcon, Sun, Moon, CheckCheck, BellOff, ExternalLink } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useNavigate } from 'react-router-dom'
@@ -12,6 +12,41 @@ interface HeaderProps {
   onToggleSidebar?: () => void
 }
 
+interface NotificationItem {
+  id: number
+  user_id: number | null
+  title: string
+  message: string
+  is_read: boolean
+  created_at: string | null
+}
+
+const formatNotifTime = (isoString?: string | null) => {
+  if (!isoString) return ''
+  try {
+    const d = new Date(isoString)
+    if (isNaN(d.getTime())) return ''
+    const now = new Date()
+    const diffMs = now.getTime() - d.getTime()
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+  } catch {
+    return ''
+  }
+}
+
 const Header: React.FC<HeaderProps> = ({
   title = 'Daily Task Tracker',
   sidebarWidth = 240,
@@ -22,22 +57,21 @@ const Header: React.FC<HeaderProps> = ({
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
 
-  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
   const profileRef = useRef<HTMLDivElement>(null)
 
-  const displayName = user?.name || 'Anjali HR'
+  const displayName = user?.name || 'HR Administrator'
   const displayRole = (user?.role || 'HR').toUpperCase()
   const initial = displayName.charAt(0).toUpperCase()
 
   const fetchNotifications = async () => {
     try {
       const res = await api.get('/notifications')
-      if (Array.isArray(res.data)) {
-        setNotifications(res.data)
-      }
+      const notifArray = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+      setNotifications(notifArray)
     } catch (err) {
       console.error('Failed to load notifications', err)
     }
@@ -52,7 +86,7 @@ const Header: React.FC<HeaderProps> = ({
     }
   }
 
-  const handleMarkOneRead = async (notification: any) => {
+  const handleMarkOneRead = async (notification: NotificationItem) => {
     try {
       if (!notification.is_read) {
         await api.post(`/notifications/${notification.id}/read`)
@@ -62,23 +96,25 @@ const Header: React.FC<HeaderProps> = ({
       }
       setDropdownOpen(false)
       if (user?.role === 'hr' || user?.role === 'admin') {
-        if (notification.title?.includes('Task Not Submitted') || notification.title?.includes('Tracker')) {
+        if (notification.title?.includes('Not Submitted') || notification.title?.includes('Tracker')) {
           navigate('/admin/tracker-access')
         }
       } else if (user?.role === 'intern') {
-        navigate('/dashboard')
+        navigate('/')
       }
     } catch (err) {
-      console.error('Failed to mark notification as read', err)
+      console.error('Failed to mark single notification as read', err)
     }
   }
 
+  // Initial fetch and 15s polling
   useEffect(() => {
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 15000)
     return () => clearInterval(interval)
   }, [])
 
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
@@ -145,7 +181,7 @@ const Header: React.FC<HeaderProps> = ({
           )}
         </button>
 
-        {/* Notification Bell */}
+        {/* Polished Notification Bell & Dropdown */}
         <div className="relative" ref={notifRef}>
           <button
             type="button"
@@ -153,51 +189,81 @@ const Header: React.FC<HeaderProps> = ({
             name="btnNotifications"
             onClick={() => {
               setDropdownOpen(!dropdownOpen)
-              fetchNotifications()
+              if (!dropdownOpen) fetchNotifications()
             }}
-            className="relative text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="relative text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
+            title="Notifications"
           >
             <Bell size={20} />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 min-w-4 h-4 px-1 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
-                {unreadCount}
+              <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-extrabold flex items-center justify-center rounded-full shadow-xs ring-2 ring-white dark:ring-slate-900 animate-pulse">
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>
 
+          {/* Polished Notification Panel */}
           {dropdownOpen && (
-            <div className="absolute right-0 mt-2.5 w-84 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 z-50 overflow-hidden">
-              <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-800 dark:text-white">Notifications ({unreadCount})</span>
+            <div className="absolute right-0 mt-2.5 w-84 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/90 dark:border-slate-800 z-50 overflow-hidden">
+              {/* Header */}
+              <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-800 dark:text-white">Notifications</span>
+                  {unreadCount > 0 && (
+                    <span className="px-2 py-0.5 text-[11px] font-extrabold bg-blue-100 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800">
+                      {unreadCount} new
+                    </span>
+                  )}
+                </div>
                 {unreadCount > 0 && (
                   <button
                     type="button"
                     onClick={handleMarkAllRead}
-                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                    className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 flex items-center gap-1 hover:underline"
                   >
+                    <CheckCheck size={14} />
                     Mark all read
                   </button>
                 )}
               </div>
-              <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-72 overflow-y-auto">
+
+              {/* List */}
+              <div className="divide-y divide-slate-100 dark:divide-slate-800/80 max-h-80 overflow-y-auto">
                 {notifications.length === 0 ? (
-                  <div className="p-4 text-xs text-slate-400 text-center">No notifications</div>
+                  <div className="py-10 px-4 text-center">
+                    <BellOff size={28} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                    <p className="text-xs font-bold text-slate-600 dark:text-slate-400">No notifications yet</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">System updates will appear here</p>
+                  </div>
                 ) : (
                   notifications.map(n => (
                     <div
                       key={n.id}
                       onClick={() => handleMarkOneRead(n)}
-                      className={`p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-xs cursor-pointer ${
-                        !n.is_read ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''
+                      className={`p-4 transition-colors cursor-pointer relative group ${
+                        !n.is_read
+                          ? 'bg-blue-50/60 dark:bg-blue-950/30 hover:bg-blue-50 dark:hover:bg-blue-950/50'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 opacity-80 hover:opacity-100'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">{n.title}</p>
-                        {!n.is_read && (
-                          <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-                        )}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          {!n.is_read ? (
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 dark:bg-blue-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <CheckCheck size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                          )}
+                          <p className={`text-xs font-bold ${!n.is_read ? 'text-slate-900 dark:text-white font-extrabold' : 'text-slate-700 dark:text-slate-300'}`}>
+                            {n.title}
+                          </p>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                          {formatNotifTime(n.created_at)}
+                        </span>
                       </div>
-                      <p className="text-slate-600 dark:text-slate-400 text-xs mt-1 leading-relaxed">{n.message}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed pl-4">
+                        {n.message}
+                      </p>
                     </div>
                   ))
                 )}
@@ -215,28 +281,34 @@ const Header: React.FC<HeaderProps> = ({
             onClick={() => setProfileMenuOpen(!profileMenuOpen)}
             className="flex items-center gap-3 cursor-pointer group hover:opacity-90 transition-opacity"
           >
-            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-sm shadow-blue-500/20">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow-xs shadow-blue-600/30 group-hover:scale-105 transition-transform">
               {initial}
             </div>
-            <div className="hidden sm:block text-left leading-tight">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{displayName}</p>
-              <p className="text-xs font-semibold text-slate-400 mt-0.5">{displayRole}</p>
+            <div className="hidden sm:block text-left">
+              <div className="text-xs font-bold text-slate-800 dark:text-white leading-tight">
+                {displayName}
+              </div>
+              <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                {displayRole}
+              </div>
             </div>
-            <ChevronDown size={16} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors" />
+            <ChevronDown size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
           </button>
 
+          {/* Profile Dropdown Menu */}
           {profileMenuOpen && (
-            <div className="absolute right-0 mt-2.5 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 py-2 z-50 text-sm">
-              <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
-                <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{displayName}</p>
-                <p className="text-xs text-slate-400 truncate">{user?.email || ''}</p>
+            <div className="absolute right-0 mt-2.5 w-52 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 z-50 overflow-hidden py-1.5">
+              <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
+                <p className="text-xs font-bold text-slate-800 dark:text-white">{displayName}</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">{user?.email}</p>
               </div>
+
               <button
                 type="button"
-                id="btn-sign-out"
-                name="btnSignOut"
+                id="btn-logout"
+                name="btnLogout"
                 onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-left font-semibold transition-colors"
+                className="w-full px-4 py-2.5 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center gap-2 transition-colors cursor-pointer"
               >
                 <LogOut size={15} />
                 Sign Out
