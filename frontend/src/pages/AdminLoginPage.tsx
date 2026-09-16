@@ -98,7 +98,9 @@ const AdminLoginPage: React.FC = () => {
                 Administrator Email <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <span className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none text-slate-500">
+                  <Mail size={19} />
+                </span>
                 <input
                   id="admin-email"
                   name="email"
@@ -109,7 +111,7 @@ const AdminLoginPage: React.FC = () => {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   disabled={loading}
-                  className="w-full h-12 sm:h-[52px] pl-12 pr-4 border border-slate-800 bg-slate-900 rounded-xl text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium disabled:opacity-60 transition-all"
+                  className="w-full h-12 sm:h-[50px] pl-11 sm:pl-12 pr-4 border border-slate-800 bg-slate-900/90 rounded-xl text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-medium disabled:opacity-60 transition-all shadow-2xs"
                 />
               </div>
             </div>
@@ -122,7 +124,9 @@ const AdminLoginPage: React.FC = () => {
                 Password <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                <span className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none text-slate-500">
+                  <Lock size={19} />
+                </span>
                 <input
                   id="admin-password"
                   name="password"
@@ -133,16 +137,16 @@ const AdminLoginPage: React.FC = () => {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   disabled={loading}
-                  className="w-full h-12 sm:h-[52px] pl-12 pr-12 border border-slate-800 bg-slate-900 rounded-xl text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium disabled:opacity-60 transition-all"
+                  className="w-full h-12 sm:h-[50px] pl-11 sm:pl-12 pr-12 border border-slate-800 bg-slate-900/90 rounded-xl text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-medium disabled:opacity-60 transition-all shadow-2xs"
                 />
                 <button
                   type="button"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   title={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-200 transition-colors cursor-pointer"
+                  className="absolute inset-y-0 right-0 pr-3.5 sm:pr-4 flex items-center text-slate-500 hover:text-slate-200 transition-colors cursor-pointer"
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
                 </button>
               </div>
             </div>

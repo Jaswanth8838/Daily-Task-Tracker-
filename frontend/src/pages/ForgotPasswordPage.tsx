@@ -132,7 +132,9 @@ const ForgotPasswordPage: React.FC = () => {
                     Email <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                    <span className="absolute inset-y-0 left-0 pl-3.5 sm:pl-4 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+                      <Mail size={19} />
+                    </span>
                     <input
                       id="reset-email"
                       name="email"
@@ -143,7 +145,7 @@ const ForgotPasswordPage: React.FC = () => {
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       disabled={loading}
-                      className="w-full h-12 sm:h-[52px] pl-12 pr-4 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl text-base text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 font-medium disabled:opacity-60 transition-all"
+                      className="w-full h-12 sm:h-[50px] pl-11 sm:pl-12 pr-4 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/90 rounded-xl text-sm sm:text-base text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 font-medium disabled:opacity-60 transition-all shadow-2xs"
                     />
                   </div>
                 </div>

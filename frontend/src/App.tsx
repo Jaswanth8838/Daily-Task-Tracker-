@@ -68,15 +68,15 @@ const AppLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors">
       <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)} />
-      <div style={{ marginLeft: sidebarWidth, transition: 'margin-left 0.2s' }}>
+      <div className="min-h-screen flex flex-col" style={{ marginLeft: sidebarWidth, transition: 'margin-left 0.2s' }}>
         <Header
           title={title}
           sidebarWidth={sidebarWidth}
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        <main style={{ paddingTop: 64 }}>
-          <div className="p-8 max-w-[1560px] mx-auto">
+        <main className="flex-1 flex flex-col justify-between" style={{ paddingTop: 64 }}>
+          <div className="p-6 sm:p-8 max-w-[1560px] w-full mx-auto flex-1">
             <Routes>
               <Route path="/" element={isAdmin ? <Navigate to="/admin" replace /> : <DashboardPage />} />
               <Route path="/tracker" element={isAdmin ? <Navigate to="/admin" replace /> : <DailyTrackerPage />} />
@@ -102,9 +102,9 @@ const AppLayout: React.FC = () => {
               <Route path="*" element={<Navigate to={isAdmin ? '/admin' : '/'} replace />} />
             </Routes>
           </div>
-          <footer className="flex items-center justify-between px-8 py-6 text-sm text-slate-500 dark:text-slate-400 border-t border-slate-200/60 dark:border-slate-800/80 mt-8">
-            <span>© 2026 Task Tracker. All rights reserved.</span>
-            <span>Version 1.0.0</span>
+          <footer className="flex items-center justify-between px-6 sm:px-8 py-5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xs mt-auto">
+            <span>© 2026 Wall Street Consulting Services. All rights reserved.</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">v1.0.0</span>
           </footer>
         </main>
       </div>

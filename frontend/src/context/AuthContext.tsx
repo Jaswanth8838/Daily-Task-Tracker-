@@ -5,8 +5,11 @@ export interface User {
   id: number
   name: string
   email: string
+  employee_id?: string
+  department?: string
   role: 'intern' | 'hr' | 'admin' | 'manager' | 'employee'
   status: string
+  tracker_access_status?: string
 }
 
 interface AuthContextValue {
