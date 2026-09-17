@@ -67,6 +67,14 @@ interface PerformanceData {
     status: string
     update_text: string
   }[]
+  date_wise_submissions?: {
+    date: string
+    display_date: string
+    status: string
+    sessions: number
+    submitted_at: string | null
+    sessions_details?: any[]
+  }[]
 }
 
 const ITEMS_PER_PAGE = 8
@@ -495,7 +503,105 @@ const InternPerformancePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Row 4: Recent Training Activity Table */}
+      {/* Row 4: Date-Wise Submission History Table (Requested HR feature) */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <Calendar className="text-blue-600 dark:text-blue-400" size={18} />
+              Date-Wise Task Submission History
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Verified daily tracking compliance, status, mandatory sessions count, and submission timestamps.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-xs font-semibold">
+            <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 font-bold">
+              {summary.completed_days} Days Submitted
+            </span>
+            <span className="bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 px-3 py-1.5 rounded-xl border border-red-200 dark:border-red-900/60 font-bold">
+              {summary.missed_days} Days Missed
+            </span>
+            <span className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900/60 font-bold">
+              {summary.total_sessions} Total Sessions
+            </span>
+          </div>
+        </div>
+
+        {(!data.date_wise_submissions || data.date_wise_submissions.length === 0) ? (
+          <div className="py-12 text-center text-xs text-slate-400">No submission history recorded yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3.5 px-6">Date</th>
+                  <th className="py-3.5 px-4">Submission Status</th>
+                  <th className="py-3.5 px-4 text-center">Sessions Submitted</th>
+                  <th className="py-3.5 px-6">Submitted At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                {data.date_wise_submissions.map((item) => {
+                  const isSub = item.status === 'Submitted'
+                  const isMiss = item.status === 'Missed'
+                  const isFroz = item.status === 'Frozen'
+
+                  return (
+                    <tr key={item.date} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3.5 px-6 font-bold text-slate-800 dark:text-white whitespace-nowrap">
+                        {item.display_date}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {isSub ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60">
+                            <CheckCircle2 size={13} className="text-emerald-500" />
+                            Submitted
+                          </span>
+                        ) : isMiss ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900/60">
+                            <AlertTriangle size={13} className="text-red-500" />
+                            Missed
+                          </span>
+                        ) : isFroz ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60">
+                            <Shield size={13} className="text-amber-500" />
+                            Frozen
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/60">
+                            <Clock size={13} className="text-blue-500" />
+                            {item.status}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-bold text-slate-800 dark:text-white whitespace-nowrap font-mono">
+                        {item.sessions > 0 ? (
+                          <span className="text-blue-600 dark:text-blue-400 font-extrabold">{item.sessions}</span>
+                        ) : (
+                          <span className="text-slate-400">0</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-6 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
+                        {item.submitted_at ? (
+                          new Date(item.submitted_at).toLocaleDateString('en-GB', {
+                            day: '2-digit', month: 'short',
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                          })
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Row 5: Recent Training Activity Table */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div>

@@ -20,6 +20,7 @@ import TeamUpdatesPage from './pages/TeamUpdatesPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 import AuditLogsPage from './pages/AuditLogsPage'
+import SubmissionCalendarPage from './pages/SubmissionCalendarPage'
 import EmployeeReportPage from './pages/EmployeeReportPage'
 import InternReportPage from './pages/InternReportPage'
 
@@ -38,6 +39,7 @@ import api from './lib/api'
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/tracker': 'Daily Tracker',
+  '/submission-calendar': 'Submission Calendar',
   '/my-updates': 'My Updates',
   '/team-updates': 'Team Updates',
   '/reports': 'Reports & Analytics',
@@ -80,6 +82,7 @@ const AppLayout: React.FC = () => {
             <Routes>
               <Route path="/" element={isAdmin ? <Navigate to="/admin" replace /> : <DashboardPage />} />
               <Route path="/tracker" element={isAdmin ? <Navigate to="/admin" replace /> : <DailyTrackerPage />} />
+              <Route path="/submission-calendar" element={isAdmin ? <Navigate to="/admin/interns" replace /> : <SubmissionCalendarPage />} />
               <Route path="/my-updates" element={isAdmin ? <Navigate to="/admin/interns" replace /> : <MyUpdatesPage />} />
               <Route path="/team-updates" element={isAdmin ? <TeamUpdatesPage /> : <Navigate to="/" replace />} />
               <Route path="/reports" element={<ReportsPage />} />

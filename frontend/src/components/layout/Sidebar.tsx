@@ -19,6 +19,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: <LayoutDashboard size={19} />, path: '/', roles: ['intern', 'hr', 'admin'] },
   { label: 'Daily Tracker', icon: <Calendar size={19} />, path: '/tracker', roles: ['intern'] },
+  { label: 'Submission Calendar', icon: <Calendar size={19} />, path: '/submission-calendar', roles: ['intern'] },
   { label: 'My Updates', icon: <CheckSquare size={19} />, path: '/my-updates', roles: ['intern'] },
   { label: 'Interns', icon: <Users size={19} />, path: '/admin/interns', roles: ['hr', 'admin'] },
   { label: 'Tracker Access', icon: <Shield size={19} />, path: '/admin/tracker-access', roles: ['hr', 'admin'] },

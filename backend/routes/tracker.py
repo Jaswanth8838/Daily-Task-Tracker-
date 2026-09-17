@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, g
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from sqlalchemy import or_
 from app import db
 from models import (
@@ -572,6 +572,117 @@ def get_my_updates():
         DailyUpdate.id.asc()
     ).all()
     return jsonify([u.to_dict() for u in updates]), 200
+
+
+@tracker_bp.route('/api/tracker/submission-calendar', methods=['GET'])
+@auth_required
+def get_submission_calendar():
+    user_id = g.current_user['id']
+    user = User.query.get_or_404(user_id)
+    evaluate_intern_access(user)
+
+    year_arg = request.args.get('year')
+    month_arg = request.args.get('month')
+    today = get_today_local()
+
+    try:
+        year = int(year_arg) if year_arg else today.year
+        month = int(month_arg) if month_arg else today.month
+    except (ValueError, TypeError):
+        year = today.year
+        month = today.month
+
+    # Determine start and end date for the month
+    start_date = date(year, month, 1)
+    if month == 12:
+        end_date = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        end_date = date(year, month + 1, 1) - timedelta(days=1)
+
+    trackers = DailyTracker.query.filter(
+        DailyTracker.user_id == user_id,
+        DailyTracker.date >= start_date,
+        DailyTracker.date <= end_date
+    ).all()
+
+    tracker_dict = {t.date: t for t in trackers}
+
+    # Determine joining date
+    intern_profile = Intern.query.filter_by(user_id=user_id).first()
+    joining_date = intern_profile.joining_date if (intern_profile and intern_profile.joining_date) else user.created_at.date()
+
+    calendar_days = []
+    curr = start_date
+    total_days_submitted = 0
+    total_days_missed = 0
+    total_sessions_submitted = 0
+
+    while curr <= end_date:
+        t = tracker_dict.get(curr)
+        sessions_count = len(t.sessions) if t else 0
+        total_duration = sum((s.duration_hrs or 0.0) for s in t.sessions) if t else 0.0
+
+        if t and t.status == 'submitted':
+            status = 'submitted'
+            submitted_at = t.updated_at.isoformat() if t.updated_at else (t.created_at.isoformat() if t.created_at else None)
+            total_days_submitted += 1
+            total_sessions_submitted += sessions_count
+        elif t and t.status in ('frozen', 'missed'):
+            status = 'frozen' if t.status == 'frozen' else 'missed'
+            submitted_at = None
+            total_days_missed += 1
+        elif curr < today:
+            if curr >= joining_date:
+                status = 'missed'
+                total_days_missed += 1
+            else:
+                status = 'not_applicable'
+            submitted_at = None
+        elif curr == today:
+            status = 'today_pending' if not (t and t.status == 'submitted') else 'submitted'
+            submitted_at = t.updated_at.isoformat() if (t and t.status == 'submitted') else None
+            if status == 'submitted':
+                total_days_submitted += 1
+                total_sessions_submitted += sessions_count
+        else:
+            status = 'future'
+            submitted_at = None
+
+        calendar_days.append({
+            'date': curr.isoformat(),
+            'day': curr.day,
+            'weekday': curr.strftime('%a'),
+            'status': status,
+            'sessions_count': sessions_count,
+            'total_duration': round(total_duration, 1),
+            'submitted_at': submitted_at,
+            'sessions': [s.to_dict() for s in sorted(t.sessions, key=lambda x: x.session_number or 0)] if t else []
+        })
+        curr += timedelta(days=1)
+
+    # Calculate overall stats for all-time
+    all_submitted = DailyTracker.query.filter_by(user_id=user_id, status='submitted').all()
+    all_time_submitted_days = len(all_submitted)
+    all_time_sessions = sum(len(tr.sessions) for tr in all_submitted)
+    all_time_missed = DailyTracker.query.filter(
+        DailyTracker.user_id == user_id,
+        DailyTracker.status.in_(['frozen', 'missed'])
+    ).count()
+
+    return jsonify({
+        'year': year,
+        'month': month,
+        'month_name': start_date.strftime('%B %Y'),
+        'total_days_submitted': total_days_submitted,
+        'total_days_missed': total_days_missed,
+        'total_sessions_submitted': total_sessions_submitted,
+        'all_time': {
+            'submitted_days': all_time_submitted_days,
+            'missed_days': all_time_missed,
+            'total_sessions': all_time_sessions
+        },
+        'calendar_days': calendar_days
+    }), 200
 
 
 @tracker_bp.route('/api/intern/reports/languages', methods=['GET'])

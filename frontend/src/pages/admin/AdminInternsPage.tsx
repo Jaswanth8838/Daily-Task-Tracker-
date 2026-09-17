@@ -13,6 +13,7 @@ interface InternSummary {
   today_task: string
   total_training_hours: number
   submitted_days: number
+  total_sessions?: number
   missed_days: number
 }
 
@@ -160,6 +161,8 @@ const AdminInternsPage: React.FC = () => {
                 <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <th className="py-4 px-6">Intern Name</th>
                   <th className="py-4 px-4">Employee ID</th>
+                  <th className="py-4 px-4 text-center">Days Submitted</th>
+                  <th className="py-4 px-4 text-center">Sessions</th>
                   <th className="py-4 px-4">Tracker Access</th>
                   <th className="py-4 px-4">Today's Task</th>
                   <th className="py-4 px-6 text-right">Action</th>
@@ -169,13 +172,26 @@ const AdminInternsPage: React.FC = () => {
                 {paginatedInterns.map((intern) => (
                   <tr key={intern.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-4 px-6 font-bold text-slate-800 dark:text-white whitespace-nowrap">
-                      <div>
-                        <span className="text-sm">{intern.name}</span>
+                      <div
+                        onClick={() => navigate(`/admin/interns/${intern.id}`)}
+                        className="cursor-pointer group inline-block"
+                      >
+                        <span className="text-sm text-blue-600 dark:text-blue-400 group-hover:underline">{intern.name}</span>
                         <p className="text-xs text-slate-400 dark:text-slate-500 font-normal">{intern.email}</p>
                       </div>
                     </td>
-                    <td className="py-4 px-4 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
+                    <td className="py-4 px-4 font-mono font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                       {intern.employee_id}
+                    </td>
+                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-extrabold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 font-mono">
+                        {intern.submitted_days} days
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-extrabold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 font-mono">
+                        {intern.total_sessions || (intern.submitted_days * 3)}
+                      </span>
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap">
                       <span
@@ -198,7 +214,7 @@ const AdminInternsPage: React.FC = () => {
                         id={`btn-view-perf-${intern.id}`}
                         name={`btnViewPerf-${intern.id}`}
                         onClick={() => navigate(`/admin/interns/${intern.id}`)}
-                        className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs shadow-blue-600/30 inline-flex items-center gap-1.5"
+                        className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs shadow-blue-600/30 inline-flex items-center gap-1.5 cursor-pointer"
                       >
                         <BarChart2 size={14} />
                         View Performance

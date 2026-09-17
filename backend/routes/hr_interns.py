@@ -46,7 +46,10 @@ def get_hr_interns():
         all_updates = DailyUpdate.query.filter_by(user_id=intern.id).all()
         total_hours = sum(u.duration_hrs or 0.0 for u in all_updates)
 
-        submitted_days = DailyTracker.query.filter_by(user_id=intern.id, status='submitted').count()
+        submitted_trackers = DailyTracker.query.filter_by(user_id=intern.id, status='submitted').all()
+        submitted_days = len(submitted_trackers)
+        total_sessions = sum(len(t.sessions) for t in submitted_trackers)
+
         missed_days = DailyTracker.query.filter(
             DailyTracker.user_id == intern.id,
             DailyTracker.status.in_(['frozen', 'missed'])
@@ -62,6 +65,7 @@ def get_hr_interns():
             'today_task': today_task,
             'total_training_hours': round(total_hours, 1),
             'submitted_days': submitted_days,
+            'total_sessions': total_sessions,
             'missed_days': missed_days,
             'joining_date': intern_profile.joining_date.isoformat() if (intern_profile and intern_profile.joining_date) else None,
             'created_at': intern.created_at.isoformat() if intern.created_at else None
@@ -208,6 +212,44 @@ def get_intern_performance(intern_id):
     recent_updates = DailyUpdate.query.filter_by(user_id=intern.id).order_by(DailyUpdate.date.desc(), DailyUpdate.id.desc()).limit(50).all()
     recent_sessions = [u.to_dict() for u in recent_updates]
 
+    # 6. Date-wise Submission History (Chronological/Reverse)
+    date_history = []
+    # Query all trackers for this intern
+    all_intern_trackers = DailyTracker.query.filter_by(user_id=intern.id).order_by(DailyTracker.date.desc()).all()
+    tracker_map = {t.date: t for t in all_intern_trackers}
+
+    # Iterate backwards from today to joining date
+    intern_join_date = intern_profile.joining_date if (intern_profile and intern_profile.joining_date) else intern.created_at.date()
+    curr_d = today
+    while curr_d >= intern_join_date:
+        t_record = tracker_map.get(curr_d)
+        if t_record and t_record.status == 'submitted':
+            h_status = 'Submitted'
+            h_sessions = len(t_record.sessions)
+            h_submitted_at = t_record.updated_at.isoformat() if t_record.updated_at else (t_record.created_at.isoformat() if t_record.created_at else None)
+        elif t_record and t_record.status in ('frozen', 'missed'):
+            h_status = 'Frozen' if t_record.status == 'frozen' else 'Missed'
+            h_sessions = 0
+            h_submitted_at = None
+        elif curr_d == today:
+            h_status = 'Pending Today'
+            h_sessions = len(t_record.sessions) if t_record else 0
+            h_submitted_at = None
+        else:
+            h_status = 'Missed'
+            h_sessions = 0
+            h_submitted_at = None
+
+        date_history.append({
+            'date': curr_d.isoformat(),
+            'display_date': curr_d.strftime('%d %b %Y'),
+            'status': h_status,
+            'sessions': h_sessions,
+            'submitted_at': h_submitted_at,
+            'sessions_details': [s.to_dict() for s in sorted(t_record.sessions, key=lambda x: x.session_number or 0)] if t_record else []
+        })
+        curr_d -= timedelta(days=1)
+
     return jsonify({
         'intern': {
             'id': intern.id,
@@ -235,5 +277,6 @@ def get_intern_performance(intern_id):
         'submission_status': submission_status,
         'technology_distribution': technology_distribution,
         'session_stats': session_stats,
-        'recent_sessions': recent_sessions
+        'recent_sessions': recent_sessions,
+        'date_wise_submissions': date_history
     }), 200
